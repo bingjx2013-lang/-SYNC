@@ -1,14 +1,41 @@
 plugins {
     id 'com.android.application'
 }
+
+def syncKeystoreFile = System.getenv('SYNCDARK_KEYSTORE_FILE')
+
 android {
     namespace 'com.syncdark.mobile'
     compileSdk 35
+
     defaultConfig {
         applicationId 'com.syncdark.mobile'
         minSdk 23
         targetSdk 35
         versionCode 3332
         versionName '0.3.3.2'
+    }
+
+    signingConfigs {
+        release {
+            // The CI workflow requires these values from protected GitHub Actions secrets.
+            // Never commit the keystore or its passwords to source control.
+            if (syncKeystoreFile) {
+                storeFile file(syncKeystoreFile)
+                storePassword System.getenv('SYNCDARK_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('SYNCDARK_KEY_ALIAS')
+                keyPassword System.getenv('SYNCDARK_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Debug APKs are local-only. CI must not publish rotating debug signatures.
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
     }
 }
