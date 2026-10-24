@@ -44,7 +44,7 @@
       if (title) title.textContent = '正在准备安装包';
       window.location.href = '/api/download/android.apk';
       window.setTimeout(() => {
-        if (progress) progress.style.width = '100%';
+        if (progress) progress.style.width = '35%';
         if (status) status.textContent = '已发起下载；请检查浏览器下载记录';
         if (progressText) progressText.textContent = '已请求';
         if (title) title.textContent = '下载请求已发送';
