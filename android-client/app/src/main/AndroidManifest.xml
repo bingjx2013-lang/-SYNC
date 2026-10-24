@@ -4,6 +4,7 @@
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:label="暗域 · SYNC"
+        android:icon="@drawable/ic_syncdark"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
