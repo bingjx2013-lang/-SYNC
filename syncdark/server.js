@@ -40,8 +40,9 @@ async function getKevCatalog(force=false){
 }
 
 function securityEvent(kind,severity,summary,source='server'){
-  securityEvents.unshift({id:++securitySeq,ts:Date.now(),kind,severity,summary,source});
-  if(securityEvents.length>250)securityEvents.length=250;
+  const event={id:++securitySeq,ts:Date.now(),kind,severity,summary,source};
+  securityEvents.unshift(event);if(securityEvents.length>250)securityEvents.length=250;
+  if(pgPool&&pgReady)pgPool.query('INSERT INTO sync_security_events(event_ts,kind,severity,summary,source) VALUES($1,$2,$3,$4,$5)',[event.ts,event.kind,event.severity,event.summary,event.source]).catch(e=>{pgInitError=String(e.message||e).slice(0,160)});
 }
 function sourceKey(req){
   const raw=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'unknown').split(',')[0].trim();
