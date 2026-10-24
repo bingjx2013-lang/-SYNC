@@ -1,0 +1,27 @@
+name: SYNC server smoke tests
+on:
+  pull_request:
+    paths:
+      - 'syncdark/**'
+      - '.github/workflows/node-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'syncdark/**'
+      - '.github/workflows/node-test.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        working-directory: syncdark
+        run: npm install
+      - name: Run server smoke tests
+        working-directory: syncdark
+        run: npm test
