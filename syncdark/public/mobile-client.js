@@ -4,7 +4,7 @@
   const page = $('#mobileapp');
   if (!page || page.dataset.mobileReady === '1') return;
   page.dataset.mobileReady = '1';
-  const fallbackVersion = '0.2.17';
+  const fallbackVersion = 'v0.3.3.2';
   const text = (id, value) => { const el = $('#' + id); if (el) el.textContent = value; };
   async function loadVersions() {
     text('appVersionState', '正在检查版本…');
