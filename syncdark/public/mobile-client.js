@@ -17,10 +17,10 @@
       text('appCurrent', app);
       text('serverVersion', 'SYS.V ' + String(data.serverVersion || '未知'));
       text('appLatest', latest);
-      text('appVersionState', app === latest ? '当前已是最新登记测试版本' : '发现新测试版本，请获取新版 APK');
+      text('appVersionState', app === latest ? '当前已是最新版本，可以查看更新内容或重新下载安装包。' : '发现新测试版本，请获取新版 APK。');
       text('appUpdateText', app === latest
-        ? '这是版本登记状态，不代表手机已安装该 APK。Android 安装包需要单独下载并由系统安装。'
-        : '发现新测试版本 ' + latest + '。请从 Android APK 构建记录下载 APK，不要使用网页安装按钮代替。');
+        ? '常规更新 · 聊天同步与连接稳定性优化。版本登记不代表手机已安装该 APK。'
+        : '发现新测试版本 ' + latest + '。下载 APK 后，请按 Android 系统提示完成安装。');
     } catch (_) {
       text('appVersionState', '无法读取服务器版本');
       text('appCurrent', fallbackVersion);
@@ -31,12 +31,28 @@
   }
   const btn = $('#appInstall');
   if (btn) {
-    btn.textContent = '↓ 获取 Android APK 安装包';
+    btn.textContent = '⇩　获取 Android 安装包';
     btn.disabled = false;
     btn.addEventListener('click', () => {
+      const progress = $('#appProgress');
+      const status = $('#appDownloadStatus');
+      const progressText = $('#appProgressText');
+      const title = $('#appDownloadTitle');
+      if (progress) progress.style.width = '35%';
+      if (status) status.textContent = '正在请求测试 APK…';
+      if (progressText) progressText.textContent = '准备中';
+      if (title) title.textContent = '正在准备安装包';
       window.location.href = '/api/download/android.apk';
+      window.setTimeout(() => {
+        if (progress) progress.style.width = '100%';
+        if (status) status.textContent = '已发起下载；请检查浏览器下载记录';
+        if (progressText) progressText.textContent = '已请求';
+        if (title) title.textContent = '下载请求已发送';
+      }, 1200);
     });
   }
+  const website = $('#appWebsite');
+  if (website) website.addEventListener('click', () => window.open('/', '_self'));
   const refresh = $('#appRefresh');
   if (refresh) refresh.addEventListener('click', async () => {
     refresh.disabled = true;
