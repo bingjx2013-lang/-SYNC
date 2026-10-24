@@ -16,6 +16,27 @@ const NODE_TARGETS=[
 ];
 let nodeSnapshot=null,nodeSnapshotAt=0,nodeProbeInFlight=null;
 const securityEvents=[];const requestWindows=new Map();let securitySeq=0;
+const KEV_URL='https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json';
+let kevCache={fetchedAt:0,sourceUpdatedAt:null,items:[],catalogVersion:null,error:null},kevInFlight=null;
+async function getKevCatalog(force=false){
+  if(!force&&kevCache.fetchedAt&&Date.now()-kevCache.fetchedAt<6*60*60*1000)return kevCache;
+  if(kevInFlight)return kevInFlight;
+  kevInFlight=(async()=>{
+    const response=await fetch(KEV_URL,{headers:{'Accept':'application/json','User-Agent':'SYNC-Security-Monitor/1.0'},signal:AbortSignal.timeout(8000)});
+    if(!response.ok)throw new Error('CISA catalog HTTP '+response.status);
+    const data=await response.json();
+    if(!Array.isArray(data.vulnerabilities))throw new Error('Unexpected CISA catalog format');
+    const now=Date.now(),cutoff=now-60*86400000;
+    const items=data.vulnerabilities.filter(v=>/^CVE-\d{4}-\d{4,}$/.test(v.cveID||''))
+      .map(v=>({cveID:v.cveID,dateAdded:v.dateAdded||'',vendorProject:v.vendorProject||'Unknown',product:v.product||'',vulnerabilityName:v.vulnerabilityName||'',shortDescription:String(v.shortDescription||'').slice(0,600),requiredAction:String(v.requiredAction||'Follow vendor guidance and apply available patches.').slice(0,500),knownRansomwareCampaignUse:v.knownRansomwareCampaignUse||'Unknown',dueDate:v.dueDate||'',sourceUrl:'https://www.cisa.gov/known-exploited-vulnerabilities-catalog'}))
+      .filter(v=>{const t=Date.parse(v.dateAdded);return Number.isFinite(t)&&t>=cutoff})
+      .sort((a,b)=>Date.parse(b.dateAdded)-Date.parse(a.dateAdded)).slice(0,30);
+    kevCache={fetchedAt:now,sourceUpdatedAt:data.dateReleased||data.catalogVersion||null,catalogVersion:data.catalogVersion||null,totalCatalogEntries:data.count||data.vulnerabilities.length,items,error:null};
+    return kevCache;
+  })().catch(error=>{kevCache={...kevCache,error:String(error.message||error).slice(0,180)};return kevCache}).finally(()=>{kevInFlight=null});
+  return kevInFlight;
+}
+
 function securityEvent(kind,severity,summary,source='server'){
   securityEvents.unshift({id:++securitySeq,ts:Date.now(),kind,severity,summary,source});
   if(securityEvents.length>250)securityEvents.length=250;
@@ -39,6 +60,15 @@ let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
 const srv=http.createServer((req,res)=>{
   observeRequest(req);
+  if(req.url.split('?')[0]==='/api/threat-intel'){
+    const force=new URL(req.url,'http://localhost').searchParams.get('refresh')==='1';
+    getKevCatalog(force).then(data=>{
+      const ready=!!data.fetchedAt;
+      res.writeHead(ready?200:503,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+      res.end(JSON.stringify({source:'CISA Known Exploited Vulnerabilities (KEV) Catalog',sourceUrl:'https://www.cisa.gov/known-exploited-vulnerabilities-catalog',feedUrl:KEV_URL,scope:'known-exploited-vulnerability advisories; not live attack telemetry',status:ready?(data.error?'stale':'ok'):'unavailable',checkedAt:Date.now(),fetchedAt:data.fetchedAt||null,sourceUpdatedAt:data.sourceUpdatedAt||null,catalogVersion:data.catalogVersion||null,totalCatalogEntries:data.totalCatalogEntries||null,items:data.items||[],error:data.error||null}));
+    }).catch(()=>{if(!res.writableEnded){res.writeHead(503,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify({status:'unavailable',items:[],error:'Threat feed unavailable'}))}});
+    return
+  }
   if(req.url.split('?')[0]==='/api/security'){res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({checkedAt:Date.now(),scope:'application-http-and-websocket-observations',events:securityEvents.slice(0,100),totals:{events:securityEvents.length,high:securityEvents.filter(e=>e.severity==='high').length,medium:securityEvents.filter(e=>e.severity==='medium').length,low:securityEvents.filter(e=>e.severity==='low').length}}));return}
   if(req.url==='/healthz'){res.writeHead(200).end('ok');return}
   if(req.url.split('?')[0]==='/api/nodes'){
