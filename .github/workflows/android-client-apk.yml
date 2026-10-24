@@ -12,42 +12,99 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: syncdark-android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build-debug-apk:
+  build-signed-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout test branch
         uses: actions/checkout@v4
+
+      - name: Require stable Android signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=()
+          [[ -n "$KEYSTORE_BASE64" ]] || missing+=("SYNCDARK_ANDROID_KEYSTORE_BASE64")
+          [[ -n "$KEYSTORE_PASSWORD" ]] || missing+=("SYNCDARK_ANDROID_KEYSTORE_PASSWORD")
+          [[ -n "$KEY_ALIAS" ]] || missing+=("SYNCDARK_ANDROID_KEY_ALIAS")
+          [[ -n "$KEY_PASSWORD" ]] || missing+=("SYNCDARK_ANDROID_KEY_PASSWORD")
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::APK publishing is blocked until a persistent signing key is configured."
+            printf 'Missing GitHub Actions secret: %s\n' "${missing[@]}"
+            exit 1
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Build test APK
+
+      - name: Install persistent signing keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p android-client/.signing
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android-client/.signing/syncdark-release.jks
+          chmod 600 android-client/.signing/syncdark-release.jks
+          test -s android-client/.signing/syncdark-release.jks
+
+      - name: Build release APK with persistent signature
         working-directory: android-client
-        run: gradle --no-daemon assembleDebug
+        env:
+          SYNCDARK_KEYSTORE_FILE: ${{ github.workspace }}/android-client/.signing/syncdark-release.jks
+          SYNCDARK_KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          SYNCDARK_KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+          SYNCDARK_KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          APK="android-client/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          jarsigner -verify -strict -verbose "$APK"
+          echo "Release APK exists and its JAR signature verifies."
+
       - name: Publish APK for direct website download
+        shell: bash
         run: |
           mkdir -p syncdark/public/downloads
-          cp android-client/app/build/outputs/apk/debug/app-debug.apk syncdark/public/downloads/syncdark-android-test.apk
+          cp android-client/app/build/outputs/apk/release/app-release.apk syncdark/public/downloads/syncdark-android-test.apk
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+users.noreply.github.com"
           git add syncdark/public/downloads/syncdark-android-test.apk
           if git diff --cached --quiet; then
-            echo "APK is unchanged; skipping commit."
+            echo "APK binary is unchanged."
           else
-            git commit -m "Publish Android test APK for direct download"
+            git commit -m "Publish persistently signed Android test APK"
             git pull --rebase origin feature/live-refresh-3d-globe
             git push
           fi
-      - name: Upload APK artifact
+
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: syncdark-android-test-apk
-          path: android-client/app/build/outputs/apk/debug/app-debug.apk
+          name: syncdark-android-test-apk-signed
+          path: android-client/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: rm -rf android-client/.signing
