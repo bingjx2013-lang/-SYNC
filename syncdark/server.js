@@ -1,4 +1,4 @@
-const http=require('http'),fs=require('fs'),path=require('path'),os=require('os'),{WebSocketServer}=require('ws');
+const http=require('http'),fs=require('fs'),path=require('path'),os=require('os'),crypto=require('crypto'),{WebSocketServer}=require('ws');
 const PORT=process.env.PORT||3000,PUB=path.join(__dirname,'public');
 const NODE_TARGETS=[
  {id:'CF-DOH',name:'Cloudflare DNS',provider:'Cloudflare',category:'dns',lat:37.8,lon:-122.4,displayUrl:'cloudflare-dns.com/dns-query',url:'https://cloudflare-dns.com/dns-query?name=example.com&type=A',headers:{accept:'application/dns-json'}},
@@ -15,6 +15,25 @@ const NODE_TARGETS=[
  {id:'AWS-STATUS',name:'AWS status page',provider:'Amazon Web Services',category:'web',lat:39.0,lon:-77.5,displayUrl:'health.aws.amazon.com/health/status',url:'https://health.aws.amazon.com/health/status'}
 ];
 let nodeSnapshot=null,nodeSnapshotAt=0,nodeProbeInFlight=null;
+const securityEvents=[];const requestWindows=new Map();let securitySeq=0;
+function securityEvent(kind,severity,summary,source='server'){
+  securityEvents.unshift({id:++securitySeq,ts:Date.now(),kind,severity,summary,source});
+  if(securityEvents.length>250)securityEvents.length=250;
+}
+function sourceKey(req){
+  const raw=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'unknown').split(',')[0].trim();
+  return crypto.createHash('sha256').update(raw).digest('hex').slice(0,8);
+}
+function observeRequest(req){
+  const now=Date.now(),key=sourceKey(req),url=String(req.url||'/').slice(0,500);
+  let w=requestWindows.get(key);if(!w||now-w.start>60000)w={start:now,count:0};w.count++;requestWindows.set(key,w);
+  if(w.count===60)securityEvent('request_burst','medium','单一来源 60 秒内请求达到 60 次，需人工核查',key);
+  if(/(?:\.\.\/|%2e%2e|\/\.env|\/wp-admin|\/wp-login|\/etc\/passwd|\/\.git\/)/i.test(url))
+    securityEvent('suspicious_path','high','检测到疑似目录穿越或常见敏感路径扫描请求',key);
+  if(!['GET','HEAD','POST','OPTIONS'].includes(req.method))
+    securityEvent('unusual_method','medium','检测到非预期 HTTP 方法：'+String(req.method).slice(0,16),key);
+  if(requestWindows.size>2000)for(const [k,v] of requestWindows)if(now-v.start>120000)requestWindows.delete(k);
+}
 
 let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
@@ -79,12 +98,12 @@ wss.on('connection',ws=>{
       leave(ws);
       let r=rooms.get(room);
       if(!r){if(rooms.size>=200)return send(ws,{t:'err',x:'服务器房间数已满'});r={id:room,clients:new Set(),hist:[]};rooms.set(room,r)}
-      if(r.clients.size>=200)return send(ws,{t:'err',x:'房间已满'});
+      if(r.clients.size>=200){securityEvent('room_capacity','low','聊天房间达到连接容量限制','websocket');return send(ws,{t:'err',x:'房间已满'});}
       ws.room=r;ws.name=name;ws.cid=String(m.cid||'').slice(0,24);r.clients.add(ws);
       send(ws,{t:'hist',m:r.hist});bcast(r,{t:'users',list:users(r)});
     }else if(m.t==='msg'&&ws.room){
       const now=Date.now();ws.hits=ws.hits.filter(t=>now-t<5000);
-      if(ws.hits.length>=10)return send(ws,{t:'err',x:'发送太快，请稍后再试'});
+      if(ws.hits.length>=10){securityEvent('chat_rate_limit','medium','聊天连接触发每 5 秒消息速率限制','websocket');return send(ws,{t:'err',x:'发送太快，请稍后再试'});}
       ws.hits.push(now);
       const x=String(m.x||'').slice(0,4000);if(!x)return;
       const o={t:'msg',n:ws.name,c:ws.cid,x,e:m.e?1:0,ts:now},r=ws.room;
