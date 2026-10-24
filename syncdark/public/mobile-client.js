@@ -33,22 +33,37 @@
   if (btn) {
     btn.textContent = '⇩　获取 Android 安装包';
     btn.disabled = false;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const progress = $('#appProgress');
       const status = $('#appDownloadStatus');
       const progressText = $('#appProgressText');
       const title = $('#appDownloadTitle');
-      if (progress) progress.style.width = '35%';
-      if (status) status.textContent = '正在请求测试 APK…';
-      if (progressText) progressText.textContent = '准备中';
-      if (title) title.textContent = '正在准备安装包';
-      window.location.href = '/api/download/android.apk';
-      window.setTimeout(() => {
+      btn.disabled = true;
+      if (progress) progress.style.width = '8%';
+      if (status) status.textContent = '正在检查签名版安装包…';
+      if (progressText) progressText.textContent = '检查中';
+      if (title) title.textContent = '正在检查安装包';
+      try {
+        const probe = await fetch('/api/download/android.apk', { method: 'HEAD', cache: 'no-store' });
+        if (!probe.ok) throw new Error('apk-not-ready');
         if (progress) progress.style.width = '35%';
-        if (status) status.textContent = '已发起下载；请检查浏览器下载记录';
-        if (progressText) progressText.textContent = '已请求';
-        if (title) title.textContent = '下载请求已发送';
-      }, 1200);
+        if (status) status.textContent = '已找到安装包，正在启动系统下载…';
+        if (progressText) progressText.textContent = '准备下载';
+        window.location.href = '/api/download/android.apk';
+        window.setTimeout(() => {
+          if (status) status.textContent = '已发起下载；请检查通知栏或下载记录';
+          if (progressText) progressText.textContent = '已请求';
+          if (title) title.textContent = '等待系统下载';
+          btn.disabled = false;
+        }, 1500);
+      } catch (_) {
+        if (progress) progress.style.width = '0%';
+        if (status) status.textContent = '稳定签名版 APK 尚未发布，请先完成签名配置';
+        if (progressText) progressText.textContent = '暂不可下载';
+        if (title) title.textContent = '签名配置待完成';
+        text('appUpdateText', '为避免安装签名冲突，暂时停止分发旧的调试签名 APK。请完成固定签名配置后再下载安装。');
+        btn.disabled = false;
+      }
     });
   }
   const website = $('#appWebsite');
