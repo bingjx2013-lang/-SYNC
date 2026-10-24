@@ -96,7 +96,7 @@ wss.on('connection',ws=>{
     let m;try{m=JSON.parse(raw)}catch{return}
     if(m.t==='join'){
       const room=String(m.room||'').slice(0,30),name=String(m.name||'').trim().slice(0,20);
-      if(!/^[\w\-\u4e00-\u9fa5]+$/.test(room)||!name)return send(ws,{t:'err',x:'房间名或昵称不合法'});
+      if(!/^[\w\-\u4e00-\u9fa5]+$/.test(room)||!name){securityEvent('invalid_chat_join','low','聊天加入请求的房间名或昵称格式无效','websocket');return send(ws,{t:'err',x:'房间名或昵称不合法'});}
       leave(ws);
       let r=rooms.get(room);
       if(!r){if(rooms.size>=200)return send(ws,{t:'err',x:'服务器房间数已满'});r={id:room,clients:new Set(),hist:[]};rooms.set(room,r)}
