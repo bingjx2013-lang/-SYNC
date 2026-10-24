@@ -87,7 +87,7 @@ test('live node probes return real endpoint results without caching',async()=>{
 test('security monitoring endpoint exposes bounded, non-cached event telemetry',async()=>{
   const r=await fetch(baseUrl+'/api/security');
   assert.equal(r.status,200);
-  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.match(r.headers.get('content-type')||'',/application\/json/);
   assert.equal(r.headers.get('cache-control'),'no-store');
   const data=await r.json();
   assert.equal(data.scope,'application-http-and-websocket-observations');
