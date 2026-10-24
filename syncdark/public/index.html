@@ -58,7 +58,7 @@
 </main></div></div>
 <script>
 const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
-function page(id){$$('.page').forEach(x=>x.classList.toggle('active',x.id===id));$$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===id));if(id==='analytics'||id==='dashboard')drawAll();if(id==='comms')$('#message').focus({preventScroll:true})}
+function page(id){$$('.page').forEach(x=>x.classList.toggle('active',x.id===id));$$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===id));if(id==='analytics'||id==='dashboard')drawAll();if(id==='nodes')drawGlobe();if(id==='comms')$('#message').focus({preventScroll:true})}
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b)page(b.dataset.page)});
 $$('[data-go]').forEach(b=>b.addEventListener('click',()=>page(b.dataset.go)));
  let latestStatus=null;
