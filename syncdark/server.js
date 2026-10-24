@@ -8,7 +8,11 @@ const NODE_TARGETS=[
  {id:'QUAD9-DNS',name:'Quad9 DNS',provider:'Quad9',category:'dns',lat:47.4,lon:8.5,displayUrl:'on.quad9.net',url:'https://on.quad9.net/'},
  {id:'OPENDNS-IP',name:'OpenDNS diagnostic',provider:'Cisco OpenDNS',category:'dns',lat:37.4,lon:-121.9,displayUrl:'diagnostic.opendns.com/myip',url:'https://diagnostic.opendns.com/myip'},
  {id:'CLOUDFLARE-TRACE',name:'Cloudflare network trace',provider:'Cloudflare',category:'web',lat:51.5,lon:-0.1,displayUrl:'cloudflare.com/cdn-cgi/trace',url:'https://www.cloudflare.com/cdn-cgi/trace'},
- {id:'GOOGLE-DOH',name:'Google Public DNS',provider:'Google',category:'dns',lat:35.7,lon:139.7,displayUrl:'dns.google/resolve',url:'https://dns.google/resolve?name=example.com&type=A',headers:{accept:'application/dns-json'}}
+ {id:'GOOGLE-DOH',name:'Google Public DNS',provider:'Google',category:'dns',lat:35.7,lon:139.7,displayUrl:'dns.google/resolve',url:'https://dns.google/resolve?name=example.com&type=A',headers:{accept:'application/dns-json'}},
+ {id:'WIKIPEDIA',name:'Wikimedia web',provider:'Wikimedia',category:'web',lat:52.5,lon:13.4,displayUrl:'www.wikipedia.org',url:'https://www.wikipedia.org/'},
+ {id:'MOZILLA',name:'Mozilla web',provider:'Mozilla',category:'web',lat:37.8,lon:-122.4,displayUrl:'www.mozilla.org',url:'https://www.mozilla.org/'},
+ {id:'FASTLY',name:'Fastly web',provider:'Fastly',category:'web',lat:37.8,lon:-122.4,displayUrl:'www.fastly.com',url:'https://www.fastly.com/'},
+ {id:'AWS-STATUS',name:'AWS status page',provider:'Amazon Web Services',category:'web',lat:39.0,lon:-77.5,displayUrl:'health.aws.amazon.com/health/status',url:'https://health.aws.amazon.com/health/status'}
 ];
 let nodeSnapshot=null,nodeSnapshotAt=0,nodeProbeInFlight=null;
 
@@ -16,10 +20,10 @@ let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
 const srv=http.createServer((req,res)=>{
   if(req.url==='/healthz'){res.writeHead(200).end('ok');return}
-  if(req.url==='/api/nodes'){
+  if(req.url.split('?')[0]==='/api/nodes'){
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
     const now=Date.now();
-    if(nodeSnapshot && now-nodeSnapshotAt<5000){res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:nodeSnapshot}));return}
+    if(!req.url.includes('refresh=') && nodeSnapshot && now-nodeSnapshotAt<5000){res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:nodeSnapshot}));return}
     if(nodeProbeInFlight){nodeProbeInFlight.then(data=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:data}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});return}
     nodeProbeInFlight=Promise.all(NODE_TARGETS.map(async target=>{
       const start=Date.now();const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),3000);
