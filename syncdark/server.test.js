@@ -66,14 +66,14 @@ test('dashboard JavaScript parses and interactive 3D globe is present',()=>{
   assert.ok(scripts.length>=1,'inline application script should exist');
   for(const script of scripts)new vm.Script(script);
   for(const marker of ['globeCanvas','pointerdown','pointermove','globePlus','globeMinus','/api/status','/api/nodes','LIVE PROBE REGISTRY','probeColor','bezierPoint','setTimeout(tick,2000)'])assert.ok(html.includes(marker),'missing '+marker);
-  assert.match(html,/3D INTERACTIVE/);
+  assert.match(html,/GLOBAL NETWORK \/ LIVE ROUTES/);
   assert.match(html,/未生成模拟数据/);
 });
 
 test('live node probes return real endpoint results without caching',async()=>{
   const r=await fetch(baseUrl+'/api/nodes');
   assert.equal(r.status,200);
-  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.match(r.headers.get('content-type')||'',/application\/json/);
   assert.equal(r.headers.get('cache-control'),'no-store');
   const data=await r.json();
   assert.ok(Array.isArray(data.nodes));
