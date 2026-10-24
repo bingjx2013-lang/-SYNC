@@ -1,8 +1,17 @@
-const http=require('http'),fs=require('fs'),path=require('path'),{WebSocketServer}=require('ws');
+const http=require('http'),fs=require('fs'),path=require('path'),os=require('os'),{WebSocketServer}=require('ws');
 const PORT=process.env.PORT||3000,PUB=path.join(__dirname,'public');
+let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
 const srv=http.createServer((req,res)=>{
   if(req.url==='/healthz'){res.writeHead(200).end('ok');return}
+  if(req.url==='/api/status'){
+    const now=Date.now(),elapsed=Math.max(1,now-lastCpuAt),delta=process.cpuUsage(lastCpu);
+    const cpuPercent=Math.min(100,Math.max(0,((delta.user+delta.system)/1000/elapsed)*100));
+    lastCpu=process.cpuUsage();lastCpuAt=now;
+    const mem=process.memoryUsage();
+    const connectedClients=[...wss.clients].filter(c=>c.readyState===1).length;
+    res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({uptimeSeconds:Math.floor(process.uptime()),cpuPercent:Number(cpuPercent.toFixed(1)),rssMb:Number((mem.rss/1048576).toFixed(1)),heapUsedMb:Number((mem.heapUsed/1048576).toFixed(1)),heapTotalMb:Number((mem.heapTotal/1048576).toFixed(1)),connectedClients,rooms:rooms.size,timestamp:now}));return
+  }
   let p;try{p=decodeURIComponent(req.url.split('?')[0])}catch{res.writeHead(400).end();return}
   if(p.endsWith('/'))p+='index.html';
   const f=path.join(PUB,p);
