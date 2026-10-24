@@ -106,7 +106,7 @@ test('CISA threat-intelligence endpoint returns bounded, labeled data and no-sto
   assert.ok(Array.isArray(data.items));
   assert.ok(data.items.length<=30);
   if(data.items.length){
-    assert.match(data.items[0].cveID,/^CVE-\d{4}-\\d{4,}$/);
+    assert.match(data.items[0].cveID,/^CVE-\d{4}-\d{4,}$/);
     assert.ok(data.items[0].sourceUrl.includes('cisa.gov'));
   }
 });
