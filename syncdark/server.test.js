@@ -3,6 +3,8 @@ const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const net=require('node:net');
 const path=require('node:path');
+const fs=require('node:fs');
+const vm=require('node:vm');
 
 let child,baseUrl;
 async function freePort(){
@@ -56,4 +58,14 @@ test('PWA manifest, service worker, and icons are served',async()=>{
   }
   const sw=await (await fetch(baseUrl+'/sw.js')).text();
   assert.match(sw,/pathname\.startsWith\('\/api\/'\)/);
+});
+
+test('dashboard JavaScript parses and interactive 3D globe is present',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
+  const scripts=[...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+  assert.ok(scripts.length>=1,'inline application script should exist');
+  for(const match of scripts)new vm.Script(match[1]);
+  for(const marker of ['globeCanvas','pointerdown','pointermove','globePlus','globeMinus','/api/status','setTimeout(tick,2000)'])assert.ok(html.includes(marker),'missing '+marker);
+  assert.match(html,/3D INTERACTIVE/);
+  assert.match(html,/未生成模拟数据/);
 });
