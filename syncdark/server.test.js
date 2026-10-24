@@ -83,3 +83,15 @@ test('live node probes return real endpoint results without caching',async()=>{
     assert.ok(n.ok===true||n.ok===false,'probe must report a real boolean result');
   }
 });
+
+test('security monitoring endpoint exposes bounded, non-cached event telemetry',async()=>{
+  const r=await fetch(baseUrl+'/api/security');
+  assert.equal(r.status,200);
+  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.equal(r.headers.get('cache-control'),'no-store');
+  const data=await r.json();
+  assert.equal(data.scope,'application-http-and-websocket-observations');
+  assert.ok(Array.isArray(data.events));
+  assert.ok(data.events.length<=100);
+  for(const key of ['events','high','medium','low'])assert.ok(key in data.totals);
+});
