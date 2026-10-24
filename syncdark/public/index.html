@@ -76,7 +76,11 @@ let globeNodes=[
 {id:'QUAD9-DNS',region:'欧洲参考区',city:'Quad9 DNS',provider:'Quad9',category:'dns',lat:47.4,lon:8.5,endpoint:'on.quad9.net',status:'等待实测',latencyMs:null,ok:null},
 {id:'OPENDNS-IP',region:'北美参考区',city:'OpenDNS diagnostic',provider:'Cisco OpenDNS',category:'dns',lat:37.4,lon:-121.9,endpoint:'diagnostic.opendns.com/myip',status:'等待实测',latencyMs:null,ok:null},
 {id:'CF-TRACE',region:'欧洲参考区',city:'Cloudflare trace',provider:'Cloudflare',category:'web',lat:51.5,lon:-0.1,endpoint:'cloudflare.com/cdn-cgi/trace',status:'等待实测',latencyMs:null,ok:null},
-{id:'GOOGLE-DOH',region:'亚洲参考区',city:'Google Public DNS',provider:'Google',category:'dns',lat:35.7,lon:139.7,endpoint:'dns.google/resolve',status:'等待实测',latencyMs:null,ok:null}
+{id:'GOOGLE-DOH',region:'亚洲参考区',city:'Google Public DNS',provider:'Google',category:'dns',lat:35.7,lon:139.7,endpoint:'dns.google/resolve',status:'等待实测',latencyMs:null,ok:null},
+{id:'WIKIPEDIA',region:'欧洲参考区',city:'Wikimedia web',provider:'Wikimedia',category:'web',lat:52.5,lon:13.4,endpoint:'www.wikipedia.org',status:'等待实测',latencyMs:null,ok:null},
+{id:'MOZILLA',region:'北美参考区',city:'Mozilla web',provider:'Mozilla',category:'web',lat:37.8,lon:-122.4,endpoint:'www.mozilla.org',status:'等待实测',latencyMs:null,ok:null},
+{id:'FASTLY',region:'北美参考区',city:'Fastly web',provider:'Fastly',category:'web',lat:37.8,lon:-122.4,endpoint:'www.fastly.com',status:'等待实测',latencyMs:null,ok:null},
+{id:'AWS-STATUS',region:'北美参考区',city:'AWS status page',provider:'Amazon Web Services',category:'web',lat:39,lon:-77.5,endpoint:'health.aws.amazon.com/health/status',status:'等待实测',latencyMs:null,ok:null}
 ];
 let globeRotY=-.45,globeRotX=-.12,globeZoom=1,globePointer=new Map(),globeDrag=null,globeSelected='CF-DOH',probeLastChecked=0,probeBusy=false;
 const landShapes=[
