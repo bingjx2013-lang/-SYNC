@@ -65,13 +65,13 @@
     <p class="muted" id="appUpdateText" style="margin:12px 0 0">正在读取服务端版本信息…</p>
   </div>
   <div class="padded" style="display:grid;gap:10px">
-    <button class="btn" id="appInstall" style="width:100%;padding:15px;font-size:15px">⇩ 安装 / 添加到手机桌面</button>
+    <button class="btn" id="appInstall" style="width:100%;padding:15px;font-size:15px">↓ 获取 Android APK 安装包</button>
     <button class="btn" id="appRefresh" style="width:100%;padding:13px">检查版本并刷新页面</button>
     <p class="tiny" id="appHelp" style="text-align:center;margin:4px 0 0">正在检测设备安装方式…</p>
   </div>
   <div class="padded" style="border-top:1px solid var(--line)">
     <strong>Android 安装说明</strong>
-    <ol class="muted" style="padding-left:22px;line-height:1.9"><li>如需网页应用，请在 Chrome 打开本站，点击上方按钮；没有弹窗时，从右上角菜单选择“安装应用”或“添加到主屏幕”。</li><li>APK 是独立 Android 安装包；网页按钮不会把网页自动变成 APK，也不能自动替换已安装的 APK。</li><li>当前测试客户端依赖网络和测试服务器；安装状态、应用版本、服务端版本是三个不同信息。</li></ol>
+    <ol class="muted" style="padding-left:22px;line-height:1.9"><li>上方按钮打开 Android APK 构建页面。下载构建产物 ZIP 后，解压并安装其中的 .apk 文件。不要点击 Chrome 的“安装应用”来代替 APK。</li><li>Android APK 是独立安装包，必须下载 .apk 文件并由 Android 系统安装；本网页本身不是 APK 下载文件。</li><li>当前测试客户端依赖网络和测试服务器；安装状态、应用版本、服务端版本是三个不同信息。</li></ol>
   </div>
 </div>
 <div class="footnote">版本来源：/api/status。若版本读取失败，会明确显示检查失败，不会把“在线”冒充成版本号。</div>
@@ -176,4 +176,4 @@ $('#globalStatus').textContent='UI READY';
 
 // Higher-resolution world coastlines from the public world-atlas / Natural Earth dataset; stylized fallback remains if offline.
 (function loadWorldCoastlines(){const topo=document.createElement('script');topo.src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';topo.onload=()=>fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',{cache:'force-cache'}).then(r=>{if(!r.ok)throw Error('world map HTTP '+r.status);return r.json()}).then(t=>{if(window.topojson&&t.objects&&t.objects.countries){worldCountries=window.topojson.feature(t,t.objects.countries).features;drawGlobe()}}).catch(()=>{});topo.onerror=()=>{};document.head.appendChild(topo)})();
-</script><script src="/chat-enhancements.js" defer></script><script src="/mobile-client.js?v=3" defer></script></body></html>
+</script><script src="/chat-enhancements.js" defer></script><script src="/mobile-client.js?v=4" defer></script></body></html>
