@@ -41,6 +41,7 @@ jobs:
             echo "APK is unchanged; skipping commit."
           else
             git commit -m "Publish Android test APK for direct download"
+            git pull --rebase origin feature/live-refresh-3d-globe
             git push
           fi
       - name: Upload APK artifact
