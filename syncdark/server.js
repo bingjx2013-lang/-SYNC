@@ -1,9 +1,40 @@
 const http=require('http'),fs=require('fs'),path=require('path'),os=require('os'),{WebSocketServer}=require('ws');
 const PORT=process.env.PORT||3000,PUB=path.join(__dirname,'public');
+const NODE_TARGETS=[
+ {id:'CF-DOH',name:'Cloudflare DNS',provider:'Cloudflare',category:'dns',lat:37.8,lon:-122.4,displayUrl:'cloudflare-dns.com/dns-query',url:'https://cloudflare-dns.com/dns-query?name=example.com&type=A',headers:{accept:'application/dns-json'}},
+ {id:'GOOGLE-204',name:'Google connectivity',provider:'Google',category:'web',lat:37.4,lon:-122.1,displayUrl:'google.com/generate_204',url:'https://www.google.com/generate_204'},
+ {id:'GITHUB-API',name:'GitHub API',provider:'GitHub',category:'web',lat:37.8,lon:-122.4,displayUrl:'api.github.com/zen',url:'https://api.github.com/zen',headers:{'user-agent':'SYNC-network-monitor/1.0','accept':'text/plain'}},
+ {id:'MS-CONNECT',name:'Microsoft connectivity',provider:'Microsoft',category:'web',lat:47.6,lon:-122.3,displayUrl:'msftconnecttest.com/connecttest.txt',url:'https://www.msftconnecttest.com/connecttest.txt'},
+ {id:'QUAD9-DNS',name:'Quad9 DNS',provider:'Quad9',category:'dns',lat:47.4,lon:8.5,displayUrl:'on.quad9.net',url:'https://on.quad9.net/'},
+ {id:'OPENDNS-IP',name:'OpenDNS diagnostic',provider:'Cisco OpenDNS',category:'dns',lat:37.4,lon:-121.9,displayUrl:'diagnostic.opendns.com/myip',url:'https://diagnostic.opendns.com/myip'},
+ {id:'CLOUDFLARE-TRACE',name:'Cloudflare network trace',provider:'Cloudflare',category:'web',lat:51.5,lon:-0.1,displayUrl:'cloudflare.com/cdn-cgi/trace',url:'https://www.cloudflare.com/cdn-cgi/trace'},
+ {id:'GOOGLE-DOH',name:'Google Public DNS',provider:'Google',category:'dns',lat:35.7,lon:139.7,displayUrl:'dns.google/resolve',url:'https://dns.google/resolve?name=example.com&type=A',headers:{accept:'application/dns-json'}}
+];
+let nodeSnapshot=null,nodeSnapshotAt=0,nodeProbeInFlight=null;
+
 let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
 const srv=http.createServer((req,res)=>{
   if(req.url==='/healthz'){res.writeHead(200).end('ok');return}
+  if(req.url==='/api/nodes'){
+    res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+    const now=Date.now();
+    if(nodeSnapshot && now-nodeSnapshotAt<5000){res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:nodeSnapshot}));return}
+    if(nodeProbeInFlight){nodeProbeInFlight.then(data=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:data}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});return}
+    nodeProbeInFlight=Promise.all(NODE_TARGETS.map(async target=>{
+      const start=Date.now();const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),3000);
+      try{
+        const response=await fetch(target.url,{method:'GET',headers:target.headers||{},signal:controller.signal,redirect:'follow'});
+        const elapsed=Date.now()-start;
+        await response.body?.cancel().catch(()=>{});
+        return {id:target.id,name:target.name,provider:target.provider,category:target.category,lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:response.status>=200&&response.status<500,status:response.status,latencyMs:elapsed,checkedAt:Date.now(),detail:response.status>=200&&response.status<500?'HTTPS endpoint responded':'HTTP error'};
+      }catch(error){
+        return {id:target.id,name:target.name,provider:target.provider,category:target.category,lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:false,status:0,latencyMs:null,checkedAt:Date.now(),detail:error.name==='AbortError'?'timeout':'connection failed'};
+      }finally{clearTimeout(timer)}
+    })).then(nodes=>{nodeSnapshot=nodes;nodeSnapshotAt=Date.now();return nodes}).finally(()=>{nodeProbeInFlight=null});
+    nodeProbeInFlight.then(nodes=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});
+    return
+  }
   if(req.url==='/api/status'){
     const now=Date.now(),elapsed=Math.max(1,now-lastCpuAt),delta=process.cpuUsage(lastCpu);
     const cpuPercent=Math.min(100,Math.max(0,((delta.user+delta.system)/1000/elapsed)*100));
