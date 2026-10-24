@@ -38,6 +38,8 @@ function observeRequest(req){
 let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
 const srv=http.createServer((req,res)=>{
+  observeRequest(req);
+  if(req.url.split('?')[0]==='/api/security'){res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({checkedAt:Date.now(),scope:'application-http-and-websocket-observations',events:securityEvents.slice(0,100),totals:{events:securityEvents.length,high:securityEvents.filter(e=>e.severity==='high').length,medium:securityEvents.filter(e=>e.severity==='medium').length,low:securityEvents.filter(e=>e.severity==='low').length}}));return}
   if(req.url==='/healthz'){res.writeHead(200).end('ok');return}
   if(req.url.split('?')[0]==='/api/nodes'){
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
