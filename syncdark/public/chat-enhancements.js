@@ -76,8 +76,7 @@
   notificationsOn = saved && ('Notification' in window) && Notification.permission === 'granted';
   updateNotifyButton(); updateUnread();
 
-  if (typeof window.chatAdd === 'function') return;
-  // The existing chatAdd is a top-level function declaration, so wrap it for optional background alerts.
+  // Wrap the existing chat renderer for optional background alerts, without changing message transport.
   const originalChatAdd = window.chatAdd;
   if (typeof originalChatAdd === 'function') {
     window.chatAdd = function(name, message, ts, mine, sys) {
