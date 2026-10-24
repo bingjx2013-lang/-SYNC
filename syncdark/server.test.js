@@ -99,14 +99,14 @@ test('security monitoring endpoint exposes bounded, non-cached event telemetry',
 test('CISA threat-intelligence endpoint returns bounded, labeled data and no-store headers',async()=>{
   const r=await fetch(baseUrl+'/api/threat-intel');
   assert.ok([200,503].includes(r.status));
-  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.match(r.headers.get('content-type')||'',/application\/json/);
   assert.equal(r.headers.get('cache-control'),'no-store');
   const data=await r.json();
   assert.ok(['ok','stale','unavailable'].includes(data.status));
   assert.ok(Array.isArray(data.items));
   assert.ok(data.items.length<=30);
   if(data.items.length){
-    assert.match(data.items[0].cveID,/^CVE-\\d{4}-\\d{4,}$/);
+    assert.match(data.items[0].cveID,/^CVE-\d{4}-\\d{4,}$/);
     assert.ok(data.items[0].sourceUrl.includes('cisa.gov'));
   }
 });
