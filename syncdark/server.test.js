@@ -64,7 +64,7 @@ test('dashboard JavaScript parses and interactive 3D globe is present',()=>{
   const html=fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
   const scripts=[...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
   assert.ok(scripts.length>=1,'inline application script should exist');
-  for(const match of scripts)new vm.Script(match[1]);
+  for(const script of scripts)new vm.Script(script);
   for(const marker of ['globeCanvas','pointerdown','pointermove','globePlus','globeMinus','/api/status','setTimeout(tick,2000)'])assert.ok(html.includes(marker),'missing '+marker);
   assert.match(html,/3D INTERACTIVE/);
   assert.match(html,/未生成模拟数据/);
