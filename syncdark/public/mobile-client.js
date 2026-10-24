@@ -34,7 +34,7 @@
     btn.textContent = '↓ 获取 Android APK 安装包';
     btn.disabled = false;
     btn.addEventListener('click', () => {
-      window.location.href = 'https://github.com/bingjx2013-lang/-SYNC/actions/workflows/android-client-apk.yml';
+      window.location.href = '/api/download/android.apk';
     });
   }
   const refresh = $('#appRefresh');
