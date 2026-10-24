@@ -1,4 +1,9 @@
 const http=require('http'),fs=require('fs'),path=require('path'),os=require('os'),crypto=require('crypto'),{WebSocketServer}=require('ws');
+const instanceId=crypto.randomUUID();
+let redisPub=null,redisSub=null,redisReady=false;
+const CHAT_CHANNEL='syncdark:world-chat:v1';
+function chatHistoryKey(room){return 'syncdark:chat:history:'+room;}
+if(process.env.REDIS_URL){try{const Redis=require('ioredis');redisPub=new Redis(process.env.REDIS_URL,{lazyConnect:true,maxRetriesPerRequest:1,connectTimeout:5000,retryStrategy:n=>Math.min(n*1000,10000),tls:{}});redisSub=new Redis(process.env.REDIS_URL,{lazyConnect:true,maxRetriesPerRequest:1,connectTimeout:5000,retryStrategy:n=>Math.min(n*1000,10000),tls:{}});redisPub.on('error',e=>{redisReady=false;console.error('chat Redis publisher error',String(e.message||e).slice(0,120))});redisSub.on('error',e=>{redisReady=false;console.error('chat Redis subscriber error',String(e.message||e).slice(0,120))});Promise.all([redisPub.connect(),redisSub.connect()]).then(()=>redisSub.subscribe(CHAT_CHANNEL)).then(()=>{redisReady=true;console.log('world chat Redis connected')}).catch(e=>{redisReady=false;console.error('chat Redis unavailable; local chat fallback active',String(e.message||e).slice(0,120))});redisSub.on('message',(channel,raw)=>{if(channel!==CHAT_CHANNEL)return;try{const event=JSON.parse(raw);if(event.origin===instanceId||!event.room)return;const r=rooms.get(event.room);if(!r)return;if(event.type==='msg'){r.hist.push(event.payload);if(r.hist.length>50)r.hist.shift();bcast(r,event.payload)}else if(event.type==='users'){bcast(r,{t:'users',list:users(r)})}}catch{}})}catch(e){console.error('chat Redis initialization failed; local chat fallback active',String(e.message||e).slice(0,120))}}
 let pgPool=null,pgReady=false,pgInitError=null;
 if(process.env.DATABASE_URL){try{const {Pool}=require('pg');pgPool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:false},max:5,connectionTimeoutMillis:5000});pgPool.on('error',e=>{pgInitError=String(e.message||e).slice(0,160)});pgPool.query('CREATE TABLE IF NOT EXISTS sync_security_events (id BIGSERIAL PRIMARY KEY,event_ts BIGINT NOT NULL,kind TEXT NOT NULL,severity TEXT NOT NULL,summary TEXT NOT NULL,source TEXT NOT NULL)').then(()=>pgPool.query('CREATE INDEX IF NOT EXISTS sync_security_events_ts_idx ON sync_security_events(event_ts DESC)')).then(()=>{pgReady=true;console.log('security event database ready')}).catch(e=>{pgInitError=String(e.message||e).slice(0,160);console.error('security database init failed',pgInitError)})}catch(e){pgInitError=String(e.message||e).slice(0,160)}}
 const PORT=process.env.PORT||3000,PUB=path.join(__dirname,'public');
@@ -135,15 +140,27 @@ const srv=http.createServer((req,res)=>{
     res.end(d);
   });
 });
-const wss=new WebSocketServer({server:srv,maxPayload:16*1024});
+const wss=new WebSocketServer({server:srv,maxPayload:16*1024,perMessageDeflate:false});
 const rooms=new Map();
 const send=(ws,o)=>{if(ws.readyState===1)ws.send(JSON.stringify(o))};
 const users=r=>[...r.clients].map(c=>c.name);
 const bcast=(r,o)=>{const s=JSON.stringify(o);r.clients.forEach(c=>{if(c.readyState===1)c.send(s)})};
+async function persistChatMessage(room,message){
+  if(!redisReady||!redisPub)return;
+  try{const key=chatHistoryKey(room);await redisPub.rpush(key,JSON.stringify(message));await redisPub.ltrim(key,-50,-1);await redisPub.expire(key,60*60*24*7)}catch(e){redisReady=false;console.error('chat history write failed',String(e.message||e).slice(0,120))}
+}
+async function loadChatHistory(room){
+  if(!redisReady||!redisPub)return null;
+  try{const rows=await redisPub.lrange(chatHistoryKey(room),-50,-1);return rows.map(row=>JSON.parse(row)).filter(m=>m&&m.t==='msg')}catch(e){redisReady=false;console.error('chat history read failed',String(e.message||e).slice(0,120));return null}
+}
+async function publishChatEvent(room,type,payload){
+  if(!redisReady||!redisPub)return;
+  try{await redisPub.publish(CHAT_CHANNEL,JSON.stringify({origin:instanceId,room,type,payload}))}catch(e){redisReady=false;console.error('chat publish failed',String(e.message||e).slice(0,120))}
+}
 function leave(ws){
   const r=ws.room;if(!r)return;
   r.clients.delete(ws);ws.room=null;
-  if(r.clients.size)bcast(r,{t:'users',list:users(r)});
+  if(r.clients.size){const payload={t:'users',list:users(r)};bcast(r,payload);publishChatEvent(r.id,'users',payload)}
   else setTimeout(()=>{if(!r.clients.size&&rooms.get(r.id)===r)rooms.delete(r.id)},600000);
 }
 wss.on('connection',ws=>{
@@ -159,7 +176,7 @@ wss.on('connection',ws=>{
       if(!r){if(rooms.size>=200)return send(ws,{t:'err',x:'服务器房间数已满'});r={id:room,clients:new Set(),hist:[]};rooms.set(room,r)}
       if(r.clients.size>=200){securityEvent('room_capacity','low','聊天房间达到连接容量限制','websocket');return send(ws,{t:'err',x:'房间已满'});}
       ws.room=r;ws.name=name;ws.cid=String(m.cid||'').slice(0,24);r.clients.add(ws);
-      send(ws,{t:'hist',m:r.hist});bcast(r,{t:'users',list:users(r)});
+      loadChatHistory(room).then(history=>{if(ws.room!==r)return;if(history){r.hist=history}send(ws,{t:'hist',m:r.hist});const payload={t:'users',list:users(r)};bcast(r,payload);publishChatEvent(room,'users',payload)});
     }else if(m.t==='msg'&&ws.room){
       const now=Date.now();ws.hits=ws.hits.filter(t=>now-t<5000);
       if(ws.hits.length>=10){securityEvent('chat_rate_limit','medium','聊天连接触发每 5 秒消息速率限制','websocket');return send(ws,{t:'err',x:'发送太快，请稍后再试'});}
@@ -167,7 +184,7 @@ wss.on('connection',ws=>{
       const x=String(m.x||'').slice(0,4000);if(!x)return;
       const o={t:'msg',n:ws.name,c:ws.cid,x,e:m.e?1:0,ts:now},r=ws.room;
       r.hist.push(o);if(r.hist.length>50)r.hist.shift();
-      bcast(r,o);
+      bcast(r,o);persistChatMessage(r.id,o);publishChatEvent(r.id,'msg',o);
     }
   });
   ws.on('close',()=>leave(ws));ws.on('error',()=>{});
