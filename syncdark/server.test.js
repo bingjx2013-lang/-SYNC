@@ -91,6 +91,9 @@ test('security monitoring endpoint exposes bounded, non-cached event telemetry',
   assert.equal(r.headers.get('cache-control'),'no-store');
   const data=await r.json();
   assert.equal(data.scope,'application-http-and-websocket-observations');
+  assert.ok(['memory','postgres','memory-fallback'].includes(data.storage));
+  assert.ok(data.retention);
+  assert.equal(data.filters.limit,100);
   assert.ok(Array.isArray(data.events));
   assert.ok(data.events.length<=100);
   for(const key of ['events','high','medium','low'])assert.ok(key in data.totals);
@@ -109,4 +112,15 @@ test('CISA threat-intelligence endpoint returns bounded, labeled data and no-sto
     assert.match(data.items[0].cveID,/^CVE-\d{4}-\d{4,}$/);
     assert.ok(data.items[0].sourceUrl.includes('cisa.gov'));
   }
+});
+
+test('security history API supports severity, event-kind and limit filters',async()=>{
+  const r=await fetch(baseUrl+'/api/security?severity=high&kind=suspicious_path&limit=5');
+  assert.equal(r.status,200);
+  const data=await r.json();
+  assert.equal(data.filters.severity,'high');
+  assert.equal(data.filters.kind,'suspicious_path');
+  assert.equal(data.filters.limit,5);
+  assert.ok(data.events.length<=5);
+  for(const e of data.events){assert.equal(e.severity,'high');assert.equal(e.kind,'suspicious_path')}
 });
