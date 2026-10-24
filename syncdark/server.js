@@ -72,7 +72,31 @@ const srv=http.createServer((req,res)=>{
     }).catch(()=>{if(!res.writableEnded){res.writeHead(503,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify({status:'unavailable',items:[],error:'Threat feed unavailable'}))}});
     return
   }
-  if(req.url.split('?')[0]==='/api/security'){res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({checkedAt:Date.now(),scope:'application-http-and-websocket-observations',events:securityEvents.slice(0,100),totals:{events:securityEvents.length,high:securityEvents.filter(e=>e.severity==='high').length,medium:securityEvents.filter(e=>e.severity==='medium').length,low:securityEvents.filter(e=>e.severity==='low').length}}));return}
+  if(req.url.split('?')[0]==='/api/security'){
+    const u=new URL(req.url,'http://localhost');
+    const limit=Math.max(1,Math.min(250,Number.parseInt(u.searchParams.get('limit')||'100',10)||100));
+    const severity=['high','medium','low'].includes(u.searchParams.get('severity'))?u.searchParams.get('severity'):'';
+    const kind=/^[a-z_]{1,40}$/.test(u.searchParams.get('kind')||'')?u.searchParams.get('kind'):'';
+    const since=Math.max(0,Number(u.searchParams.get('since')||0)||0);
+    const matches=e=>(!severity||e.severity===severity)&&(!kind||e.kind===kind)&&(!since||e.ts>=since);
+    const send=(events,storage,totalCounts)=>{res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({checkedAt:Date.now(),scope:'application-http-and-websocket-observations',storage,retention:storage==='postgres'?'persistent database history':'current process memory only; set DATABASE_URL to enable persistent history',filters:{severity:severity||null,kind:kind||null,since:since||null,limit},totals:totalCounts||{events:events.length,high:events.filter(e=>e.severity==='high').length,medium:events.filter(e=>e.severity==='medium').length,low:events.filter(e=>e.severity==='low').length},events}))};
+    if(pgPool&&pgReady){
+      const where=[],values=[];
+      if(severity){values.push(severity);where.push('severity=$'+values.length)}
+      if(kind){values.push(kind);where.push('kind=$'+values.length)}
+      if(since){values.push(since);where.push('event_ts>=$'+values.length)}
+      const clause=where.length?' WHERE '+where.join(' AND '):'';
+      Promise.all([
+        pgPool.query('SELECT id,event_ts,kind,severity,summary,source FROM sync_security_events'+clause+' ORDER BY event_ts DESC LIMIT '+limit,values),
+        pgPool.query("SELECT COUNT(*)::int AS events,COUNT(*) FILTER(WHERE severity='high')::int AS high,COUNT(*) FILTER(WHERE severity='medium')::int AS medium,COUNT(*) FILTER(WHERE severity='low')::int AS low FROM sync_security_events"+clause,values)
+      ]).then(([rows,count])=>{
+        const events=rows.rows.map(e=>({id:e.id,ts:Number(e.event_ts),kind:e.kind,severity:e.severity,summary:e.summary,source:e.source}));
+        send(events,'postgres',count.rows[0]||undefined);
+      }).catch(()=>send(securityEvents.filter(matches).slice(0,limit),'memory-fallback'));
+      return
+    }
+    send(securityEvents.filter(matches).slice(0,limit),'memory');return
+  }
   if(req.url==='/healthz'){res.writeHead(200).end('ok');return}
   if(req.url.split('?')[0]==='/api/nodes'){
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
