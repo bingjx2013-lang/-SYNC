@@ -131,6 +131,25 @@ const srv=http.createServer((req,res)=>{
     const connectedClients=[...wss.clients].filter(c=>c.readyState===1).length;
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({uptimeSeconds:Math.floor(process.uptime()),cpuPercent:Number(cpuPercent.toFixed(1)),rssMb:Number((mem.rss/1048576).toFixed(1)),heapUsedMb:Number((mem.heapUsed/1048576).toFixed(1)),heapTotalMb:Number((mem.heapTotal/1048576).toFixed(1)),connectedClients,rooms:rooms.size,appVersion:'0.2.17',latestAppVersion:'0.2.17',serverVersion:'1.0.4',timestamp:now}));return
   }
+  if(req.url.split('?')[0]==='/api/download/android.apk'){
+    const apkPath=path.join(PUB,'downloads','syncdark-android-test.apk');
+    fs.stat(apkPath,(error,stat)=>{
+      if(error||!stat.isFile()){
+        res.writeHead(404,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+        res.end(JSON.stringify({error:'Android APK 正在准备中，请稍后重试。'}));
+        return;
+      }
+      res.writeHead(200,{
+        'Content-Type':'application/vnd.android.package-archive',
+        'Content-Disposition':'attachment; filename="syncdark-android-test.apk"',
+        'Content-Length':stat.size,
+        'Cache-Control':'no-store',
+        'X-Content-Type-Options':'nosniff'
+      });
+      fs.createReadStream(apkPath).pipe(res);
+    });
+    return
+  }
   let p;try{p=decodeURIComponent(req.url.split('?')[0])}catch{res.writeHead(400).end();return}
   if(p.endsWith('/'))p+='index.html';
   const f=path.join(PUB,p);
