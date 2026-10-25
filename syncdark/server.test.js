@@ -186,12 +186,12 @@ test('Android release version follows the four-part version policy and adaptive 
   const manifest=fs.readFileSync(path.join(__dirname,'..','android-client','app','src','main','AndroidManifest.xml'),'utf8');
   const updater=fs.readFileSync(path.join(__dirname,'public','mobile-client.js'),'utf8');
   assert.match(gradle,/versionCode\s+6000002/);
-  assert.match(gradle,/versionName\s+'v0\.6\.0\.1'/);
+  assert.match(gradle,/versionName\s+'v0\.6\.0\.2'/);
   assert.match(manifest,/android:icon="@mipmap\/ic_launcher"/);
   assert.ok(fs.existsSync(path.join(__dirname,'..','android-client','app','src','main','res','mipmap','ic_launcher.xml')),'legacy launcher icon fallback should exist');
   assert.match(manifest,/android\.support\.FILE_PROVIDER_PATHS/);
   assert.ok(updater.includes('targetVersionFormat'), 'client validates four-part version names');
-  assert.match(updater,/const fallbackVersion = 'v0\.6\.0\.1'/,'fallback version matches current Android client');
+  assert.match(updater,/const fallbackVersion = 'v0\.6\.0\.2'/,'fallback version matches current Android client');
   assert.match(updater,/SHA-256/);
   assert.match(updater,/downloadAndInstall/);
   assert.match(updater,/release_not_published/,'no-release response is distinguished from service failure');
