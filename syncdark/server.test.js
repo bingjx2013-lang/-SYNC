@@ -50,6 +50,27 @@ test('status endpoint returns process metrics and disables caching',async()=>{
   assert.ok(s.rssMb>0);
   assert.equal(s.connectedClients,0);
 });
+test('Android APK version metadata is explicit and never cached',async()=>{
+  const r=await fetch(baseUrl+'/api/android/version?check='+Date.now());
+  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.equal(r.headers.get('cache-control'),'no-store');
+  assert.equal(r.headers.get('x-content-type-options'),'nosniff');
+  assert.ok([200,503].includes(r.status));
+  const data=await r.json();
+  if(r.status===200){
+    assert.equal(data.status,'available');
+    assert.match(data.versionName,/^[A-Za-z0-9._+-]{1,64}$/);
+    assert.ok(Number.isSafeInteger(data.versionCode)&&data.versionCode>0);
+    assert.match(data.sha256,/^[a-f0-9]{64}$/);
+    assert.ok(Number.isSafeInteger(data.sizeBytes)&&data.sizeBytes>0);
+    assert.equal(data.downloadUrl,'/api/download/android.apk');
+    assert.ok(Number.isFinite(Date.parse(data.publishedAt)));
+  }else{
+    assert.equal(data.status,'unavailable');
+    assert.ok(data.error);
+  }
+});
+
 test('PWA manifest, service worker, and icons are served',async()=>{
   for(const [url,type] of [['/manifest.webmanifest',/application\/manifest\+json/],['/sw.js',/javascript/],['/icon-192.png',/image\/png/],['/icon-512.png',/image\/png/]]){
     const r=await fetch(baseUrl+url);
