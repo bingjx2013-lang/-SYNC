@@ -5,7 +5,7 @@
   if (!page || page.dataset.mobileReady === '1') return;
   page.dataset.mobileReady = '1';
 
-  const fallbackVersion = 'v0.6.0.1';
+  const fallbackVersion = 'v0.6.0.2';
   const targetVersionFormat = /^v\d+\.\d+\.\d+\.\d+$/;
   const text = (id, value) => { const el = $('#' + id); if (el) el.textContent = value; };
   const nativeUpdater = window.SyncAndroidUpdater || null;
