@@ -58,7 +58,7 @@ test('APK download endpoint handles HEAD efficiently and rejects other methods',
   const post=await fetch(baseUrl+'/api/download/android.apk',{method:'POST'});
   assert.equal(post.status,405);
   assert.match(post.headers.get('allow')||'',/GET/);
-  assert.match(post.headers.get('cache-control')||'','no-store');
+  assert.equal(post.headers.get('cache-control'),'no-store');
 });
 
 test('Android APK version metadata is explicit and never cached',async()=>{
