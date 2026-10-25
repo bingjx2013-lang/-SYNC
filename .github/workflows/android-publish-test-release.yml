@@ -35,6 +35,7 @@ jobs:
       - name: Validate release version and protected signing secrets
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
@@ -90,7 +91,7 @@ jobs:
           SIZE="$(stat -c '%s' "$APK")"
           HASH="$(sha256sum "$APK" | awk '{print $1}')"
           PUBLISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          VERSION_NAME="$VERSION_NAME" VERSION_CODE="$VERSION_CODE" SIZE_BYTES="$SIZE" APK_SHA256="$HASH" PUBLISHED_AT="$PUBLISHED_AT" node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1],JSON.stringify({versionName:process.env.VERSION_NAME,versionCode:Number(process.env.VERSION_CODE),sizeBytes:Number(process.env.SIZE_BYTES),sha256:process.env.APK_SHA256,publishedAt:process.env.PUBLISHED_AT},null,2)+"\\n")' "$RUNNER_TEMP/syncdark-release/android-version.json"
+          VERSION_NAME="$VERSION_NAME" VERSION_CODE="$VERSION_CODE" SIZE_BYTES="$SIZE" APK_SHA256="$HASH" PUBLISHED_AT="$PUBLISHED_AT" node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1],JSON.stringify({versionName:process.env.VERSION_NAME,versionCode:Number(process.env.VERSION_CODE),sizeBytes:Number(process.env.SIZE_BYTES),sha256:process.env.APK_SHA256,publishedAt:process.env.PUBLISHED_AT},null,2)+"\n")' "$RUNNER_TEMP/syncdark-release/android-version.json"
 
       - name: Create public prerelease with signed APK and manifest
         shell: bash
