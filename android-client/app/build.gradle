@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+}
+
+def syncKeystoreFile = System.getenv('SYNCDARK_KEYSTORE_FILE')
+
+android {
+    namespace 'com.syncdark.mobile'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.syncdark.mobile'
+        minSdk 23
+        targetSdk 35
+        // Canonical release format: vA.B.C.D; this feature release advances B.
+        // Android update ordering uses a monotonic integer.
+        // Legacy icon fallback is included for Android API 23-25.
+        versionCode 6000002
+        versionName 'v0.6.0.2'
+    }
+
+    signingConfigs {
+        release {
+            // The CI workflow requires these values from protected GitHub Actions secrets.
+            // Never commit the keystore or its passwords to source control.
+            if (syncKeystoreFile) {
+                storeFile file(syncKeystoreFile)
+                // The release keystore created on the user's phone is PKCS12.
+                storeType = "PKCS12"
+                storePassword System.getenv('SYNCDARK_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('SYNCDARK_KEY_ALIAS')
+                keyPassword System.getenv('SYNCDARK_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Debug APKs are local-only. CI must not publish rotating debug signatures.
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+}
+
+
+dependencies {
+    implementation 'androidx.core:core:1.15.0'
+}

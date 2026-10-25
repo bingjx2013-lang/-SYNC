@@ -1,0 +1,119 @@
+name: Android Release Signing Check
+
+on:
+  push:
+    branches:
+      - feat/android-mesh-native-2026-10
+    paths:
+      - '.github/workflows/android-signing-check.yml'
+      - 'android-client/app/build.gradle'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: syncdark-android-signing-check
+  cancel-in-progress: false
+
+jobs:
+  validate-and-build:
+    if: github.ref == 'refs/heads/feat/android-mesh-native-2026-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+
+      - name: Require signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=()
+          [[ -n "$KEYSTORE_BASE64" ]] || missing+=("SYNCDARK_ANDROID_KEYSTORE_BASE64")
+          [[ -n "$KEYSTORE_PASSWORD" ]] || missing+=("SYNCDARK_ANDROID_KEYSTORE_PASSWORD")
+          [[ -n "$KEY_ALIAS" ]] || missing+=("SYNCDARK_ANDROID_KEY_ALIAS")
+          [[ -n "$KEY_PASSWORD" ]] || missing+=("SYNCDARK_ANDROID_KEY_PASSWORD")
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing required GitHub Actions signing secret(s). Values are never printed."
+            printf 'Missing secret name: %s\n' "${missing[@]}"
+            exit 1
+          fi
+          if [[ "$KEY_ALIAS" != "syncdark-release" ]]; then
+            echo "::error::SYNCDARK_ANDROID_KEY_ALIAS must be syncdark-release."
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Decode and validate PKCS12 signing keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/syncdark-signing"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12"
+          chmod 600 "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12"
+          test -s "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12"
+          if ! keytool -list -keystore "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12" \
+            -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" \
+            >"$RUNNER_TEMP/syncdark-signing/keytool.stdout" 2>"$RUNNER_TEMP/syncdark-signing/keytool.stderr"; then
+            if grep -Eqi 'password was incorrect|tampered with' "$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
+              echo "::error::Keystore password check failed. Confirm SYNCDARK_ANDROID_KEYSTORE_PASSWORD matches the original key file's store password."
+            elif grep -Eqi 'does not exist|not found|no such alias' "$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
+              echo "::error::The alias was not found in the decoded keystore. Confirm SYNCDARK_ANDROID_KEY_ALIAS is syncdark-release and the Base64 secret belongs to this keystore."
+            elif grep -Eqi 'invalid|malformed|keystore' "$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
+              echo "::error::The decoded signing file could not be read as PKCS12. Re-copy the Base64 secret from the original keystore file."
+            else
+              echo "::error::Keystore validation failed. Raw keytool output is withheld to avoid exposing sensitive metadata."
+            fi
+            exit 1
+          fi
+          echo "PKCS12 keystore and alias validated."
+
+      - name: Build signed Release APK
+        working-directory: android-client
+        env:
+          SYNCDARK_KEYSTORE_FILE: ${{ runner.temp }}/syncdark-signing/syncdark-release.p12
+          SYNCDARK_KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          SYNCDARK_KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+          SYNCDARK_KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android-client/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print -quit)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+
+      - name: Upload test artifact (not published to the website)
+        uses: actions/upload-artifact@v4
+        with:
+          name: syncdark-signed-release-check
+          path: android-client/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/syncdark-signing" android-client/.signing

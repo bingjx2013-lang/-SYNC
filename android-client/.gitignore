@@ -1,0 +1,11 @@
+# Never commit Android signing keys or local signing files
+.signing/
+*.jks
+*.keystore
+*.p12
+
+# Android/Gradle generated files
+.gradle/
+build/
+app/build/
+local.properties
