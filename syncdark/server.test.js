@@ -76,13 +76,28 @@ test('Android APK version metadata is explicit and never cached',async()=>{
     assert.ok(Number.isSafeInteger(data.sizeBytes)&&data.sizeBytes>0);
     assert.equal(data.downloadUrl,'/api/download/android.apk');
     assert.match(data.releaseTag,/^v\d+\.\d+\.\d+\.\d+$/);
-    assert.match(data.releaseUrl,/^https:\/\/github\.com\/bingjx2013-lang\/-SYNC\/releases\/tag\//);
+    assert.ok(['render-static','github-release'].includes(data.distribution));
+    assert.equal(data.releaseTag,data.versionName);
+    if(data.distribution==='render-static') assert.equal(data.releaseUrl,null);
+    else assert.match(data.releaseUrl,/^https:\/\/github\.com\/bingjx2013-lang\/-SYNC\/releases\/tag\//);
     assert.ok(Number.isFinite(Date.parse(data.publishedAt)));
   }else{
     assert.equal(data.status,'unavailable');
     assert.ok(['release_not_published','release_service_unavailable'].includes(data.code));
     assert.ok(data.error);
   }
+});
+
+test('Android APK download bytes match the published manifest',async()=>{
+  const metadataResponse=await fetch(baseUrl+'/api/android/version?check='+Date.now());
+  assert.equal(metadataResponse.status,200,'published signed APK metadata should be available');
+  const metadata=await metadataResponse.json();
+  const response=await fetch(baseUrl+'/api/download/android.apk');
+  assert.equal(response.status,200);
+  assert.match(response.headers.get('content-type')||'',/application\/vnd\.android\.package-archive/);
+  const bytes=Buffer.from(await response.arrayBuffer());
+  assert.equal(bytes.length,metadata.sizeBytes);
+  assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),metadata.sha256);
 });
 
 test('PWA manifest, service worker, and icons are served',async()=>{
@@ -170,7 +185,7 @@ test('Android release version follows the four-part version policy and adaptive 
   const gradle=fs.readFileSync(path.join(__dirname,'..','android-client','app','build.gradle'),'utf8');
   const manifest=fs.readFileSync(path.join(__dirname,'..','android-client','app','src','main','AndroidManifest.xml'),'utf8');
   const updater=fs.readFileSync(path.join(__dirname,'public','mobile-client.js'),'utf8');
-  assert.match(gradle,/versionCode\s+6000001/);
+  assert.match(gradle,/versionCode\s+6000002/);
   assert.match(gradle,/versionName\s+'v0\.6\.0\.1'/);
   assert.match(manifest,/android:icon="@mipmap\/ic_launcher"/);
   assert.ok(fs.existsSync(path.join(__dirname,'..','android-client','app','src','main','res','mipmap','ic_launcher.xml')),'legacy launcher icon fallback should exist');
