@@ -52,7 +52,7 @@ test('status endpoint returns process metrics and disables caching',async()=>{
 });
 test('APK download endpoint handles HEAD efficiently and rejects other methods',async()=>{
   const head=await fetch(baseUrl+'/api/download/android.apk',{method:'HEAD',cache:'no-store'});
-  assert.ok([200,404].includes(head.status));
+  assert.ok([200,404,503].includes(head.status));
   assert.equal(head.headers.get('cache-control'),'no-store');
   assert.equal(await head.text(),'');
   const post=await fetch(baseUrl+'/api/download/android.apk',{method:'POST'});
@@ -75,9 +75,12 @@ test('Android APK version metadata is explicit and never cached',async()=>{
     assert.match(data.sha256,/^[a-f0-9]{64}$/);
     assert.ok(Number.isSafeInteger(data.sizeBytes)&&data.sizeBytes>0);
     assert.equal(data.downloadUrl,'/api/download/android.apk');
+    assert.match(data.releaseTag,/^v\\d+\\.\\d+\\.\\d+\\.\\d+$/);
+    assert.match(data.releaseUrl,/^https:\\/\\/github\\.com\\/bingjx2013-lang\\/-SYNC\\/releases\\/tag\\//);
     assert.ok(Number.isFinite(Date.parse(data.publishedAt)));
   }else{
     assert.equal(data.status,'unavailable');
+    assert.ok(['release_not_published','release_service_unavailable'].includes(data.code));
     assert.ok(data.error);
   }
 });
@@ -110,7 +113,10 @@ test('live node probes return real endpoint results without caching',async()=>{
   const data=await r.json();
   assert.ok(Array.isArray(data.nodes));
   assert.ok(data.nodes.length>=12,'expected at least twelve public HTTPS probes');
+  assert.equal(data.kind,'public_endpoint_probes_not_nearby_devices');
+  assert.match(data.source,/public HTTPS probes/);
   for(const n of data.nodes){
+    assert.equal(n.kind,'public_endpoint_probe');
     for(const key of ['id','name','provider','category','lat','lon','endpoint','ok','status','latencyMs','checkedAt'])assert.ok(key in n,'missing '+key);
     assert.ok(n.ok===true||n.ok===false,'probe must report a real boolean result');
   }
