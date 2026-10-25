@@ -75,8 +75,8 @@ test('Android APK version metadata is explicit and never cached',async()=>{
     assert.match(data.sha256,/^[a-f0-9]{64}$/);
     assert.ok(Number.isSafeInteger(data.sizeBytes)&&data.sizeBytes>0);
     assert.equal(data.downloadUrl,'/api/download/android.apk');
-    assert.match(data.releaseTag,/^v\\d+\\.\\d+\\.\\d+\\.\\d+$/);
-    assert.match(data.releaseUrl,/^https:\\/\\/github\\.com\\/bingjx2013-lang\\/-SYNC\\/releases\\/tag\\//);
+    assert.match(data.releaseTag,/^v\d+\.\d+\.\d+\.\d+$/);
+    assert.match(data.releaseUrl,/^https:\/\/github\.com\/bingjx2013-lang\/-SYNC\/releases\/tag\//);
     assert.ok(Number.isFinite(Date.parse(data.publishedAt)));
   }else{
     assert.equal(data.status,'unavailable');
