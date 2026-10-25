@@ -123,7 +123,7 @@ const srv=http.createServer((req,res)=>{
     nodeProbeInFlight.then(nodes=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});
     return
   }
-  if(req.url==='/api/status'){
+  if(req.url.split('?')[0]==='/api/status'){
     const now=Date.now(),elapsed=Math.max(1,now-lastCpuAt),delta=process.cpuUsage(lastCpu);
     const cpuPercent=Math.min(100,Math.max(0,((delta.user+delta.system)/1000/elapsed)*100));
     lastCpu=process.cpuUsage();lastCpuAt=now;
@@ -167,11 +167,16 @@ const srv=http.createServer((req,res)=>{
     return
   }
   if(req.url.split('?')[0]==='/api/download/android.apk'){
+    const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
+    if(req.method!=='GET'&&req.method!=='HEAD'){
+      res.writeHead(405,{...headers,'Allow':'GET, HEAD'}).end(JSON.stringify({error:'Method not allowed'}));
+      return
+    }
     const apkPath=path.join(PUB,'downloads','syncdark-android-test.apk');
     fs.stat(apkPath,(error,stat)=>{
       if(error||!stat.isFile()){
-        res.writeHead(404,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
-        res.end(JSON.stringify({error:'Android APK 正在准备中，请稍后重试。'}));
+        res.writeHead(404,headers);
+        res.end(req.method==='HEAD'?'':JSON.stringify({error:'Android APK 正在准备中，请稍后重试。'}));
         return;
       }
       res.writeHead(200,{
@@ -181,6 +186,7 @@ const srv=http.createServer((req,res)=>{
         'Cache-Control':'no-store',
         'X-Content-Type-Options':'nosniff'
       });
+      if(req.method==='HEAD'){res.end();return}
       fs.createReadStream(apkPath).pipe(res);
     });
     return
