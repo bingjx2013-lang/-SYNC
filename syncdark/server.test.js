@@ -53,7 +53,7 @@ test('status endpoint returns process metrics and disables caching',async()=>{
 test('read-only operations diagnostics report dependencies without secrets or chat contents',async()=>{
   const r=await fetch(baseUrl+'/api/ops');
   assert.equal(r.status,200);
-  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.ok((r.headers.get('content-type')||'').includes('application/json'));
   assert.equal(r.headers.get('cache-control'),'no-store');
   assert.equal(r.headers.get('x-content-type-options'),'nosniff');
   const data=await r.json();
