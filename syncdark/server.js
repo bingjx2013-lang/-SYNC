@@ -95,7 +95,7 @@ async function getAndroidRelease(force=false){
       const valid=metadata&&metadata.versionName===release.tag_name&&
         /^v\d+\.\d+\.\d+\.\d+$/.test(String(metadata.versionName||''))&&
         Number.isSafeInteger(Number(metadata.versionCode))&&Number(metadata.versionCode)>0&&
-        Number.isSafeInteger(Number(metadata.sizeBytes))&&Number(metadata.sizeBytes)===Number(apkAsset.size)&&
+        Number.isSafeInteger(Number(metadata.sizeBytes))&&Number(metadata.sizeBytes)===Number(apkAsset.size)&&Number(metadata.sizeBytes)<=100*1024*1024&&
         /^[a-f0-9]{64}$/.test(String(metadata.sha256||''))&&Number.isFinite(Date.parse(metadata.publishedAt||release.published_at||''));
       if(!valid)continue;
       const result={metadata:{versionName:metadata.versionName,versionCode:Number(metadata.versionCode),sha256:metadata.sha256,sizeBytes:Number(metadata.sizeBytes),publishedAt:metadata.publishedAt||release.published_at},apkUrl:apkAsset.browser_download_url,tagName:release.tag_name,releaseUrl:release.html_url};
