@@ -40,6 +40,7 @@ public final class NodeMeshService extends Service {
     private ServerSocket server;
     private String nodeId;
     private volatile int peers = 0;
+    private final java.util.Set<String> handshakenServices = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @Override public void onCreate() {
         super.onCreate();
@@ -138,7 +139,13 @@ public final class NodeMeshService extends Service {
                     }); } catch (Exception ignored) {}
                 }
             }
-            @Override public void onServiceLost(NsdServiceInfo serviceInfo) { broadcastStatus("附近节点发生变化"); }
+            @Override public void onServiceLost(NsdServiceInfo serviceInfo) {
+                String name = serviceInfo.getServiceName();
+                if (name != null && handshakenServices.remove(name)) {
+                    synchronized (NodeMeshService.this) { peers = Math.max(0, peers - 1); }
+                }
+                broadcastStatus("附近节点发生变化");
+            }
         };
         try { nsd.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discovery); }
         catch (Exception error) { broadcastStatus("附近节点发现暂不可用"); }
@@ -154,9 +161,12 @@ public final class NodeMeshService extends Service {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
                 String response = reader.readLine();
                 if (response != null && response.contains("\"protocol\":1") && !response.contains("\"" + nodeId + "\"")) {
-                    peers = Math.min(999, peers + 1);
-                    broadcastStatus("已发现可连接的 SYNC 节点：" + info.getServiceName() + "；累计握手 " + peers + " 次");
-                    updateNotification("已发现 SYNC 节点；本机正在提供局域网握手服务");
+                    String peerName = info.getServiceName();
+                    if (peerName != null && handshakenServices.add(peerName)) {
+                        synchronized (NodeMeshService.this) { peers = Math.min(999, peers + 1); }
+                        broadcastStatus("已发现可连接的 SYNC 节点：" + peerName + "；当前已连接节点 " + peers + " 台");
+                        updateNotification("已发现 SYNC 节点；本机正在提供局域网握手服务");
+                    }
                 }
             } catch (Exception ignored) {}
         });
