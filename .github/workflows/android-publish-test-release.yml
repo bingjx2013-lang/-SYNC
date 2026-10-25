@@ -41,9 +41,9 @@ jobs:
           KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\\1/p" android-client/app/build.gradle | head -n1)"
-          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\\1/p' android-client/app/build.gradle | head -n1)"
-          [[ "$VERSION_NAME" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || { echo "::error::versionName must use vA.B.C.D"; exit 1; }
+          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\1/p" android-client/app/build.gradle | head -n1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' android-client/app/build.gradle | head -n1)"
+          [[ "$VERSION_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::versionName must use vA.B.C.D"; exit 1; }
           [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || { echo "::error::versionCode must be a positive integer"; exit 1; }
           [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD" && "$KEY_ALIAS" == "syncdark-release" && -n "$KEY_PASSWORD" ]] || { echo "::error::Required signing secrets are missing or alias is unexpected; secret values were not printed."; exit 1; }
           if gh release view "$VERSION_NAME" >/dev/null 2>&1; then
@@ -90,13 +90,7 @@ jobs:
           SIZE="$(stat -c '%s' "$APK")"
           HASH="$(sha256sum "$APK" | awk '{print $1}')"
           PUBLISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1],JSON.stringify({versionName:process.env.VERSION_NAME,versionCode:Number(process.env.VERSION_CODE),sizeBytes:Number(process.env.SIZE_BYTES),sha256:process.env.APK_SHA256,publishedAt:process.env.PUBLISHED_AT},null,2)+"\\n")' "$RUNNER_TEMP/syncdark-release/android-version.json"
-        env:
-          VERSION_NAME: ${{ env.VERSION_NAME }}
-          VERSION_CODE: ${{ env.VERSION_CODE }}
-          SIZE_BYTES: ${{ steps.release-meta.outputs.size || '0' }}
-          APK_SHA256: ${{ steps.release-meta.outputs.sha256 || '' }}
-          PUBLISHED_AT: ${{ steps.release-meta.outputs.published_at || '' }}
+          VERSION_NAME="$VERSION_NAME" VERSION_CODE="$VERSION_CODE" SIZE_BYTES="$SIZE" APK_SHA256="$HASH" PUBLISHED_AT="$PUBLISHED_AT" node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1],JSON.stringify({versionName:process.env.VERSION_NAME,versionCode:Number(process.env.VERSION_CODE),sizeBytes:Number(process.env.SIZE_BYTES),sha256:process.env.APK_SHA256,publishedAt:process.env.PUBLISHED_AT},null,2)+"\\n")' "$RUNNER_TEMP/syncdark-release/android-version.json"
 
       - name: Create public prerelease with signed APK and manifest
         shell: bash
