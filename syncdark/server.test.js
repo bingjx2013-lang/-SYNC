@@ -176,6 +176,11 @@ test('Android release version follows the four-part version policy and adaptive 
   assert.ok(fs.existsSync(path.join(__dirname,'..','android-client','app','src','main','res','mipmap','ic_launcher.xml')),'legacy launcher icon fallback should exist');
   assert.match(manifest,/android\.support\.FILE_PROVIDER_PATHS/);
   assert.ok(updater.includes('targetVersionFormat'), 'client validates four-part version names');
+  assert.match(updater,/const fallbackVersion = 'v0\\.6\\.0\\.0'/,'fallback version matches current Android client');
   assert.match(updater,/SHA-256/);
   assert.match(updater,/downloadAndInstall/);
+  assert.match(updater,/release_not_published/,'no-release response is distinguished from service failure');
+  assert.match(updater,/release_service_unavailable/,'service outage is not mislabeled as an unpublished release');
+  assert.match(updater,/检查失败，没有开始下载/,'failed update check resets progress honestly');
+  assert.match(updater,/正在查询最新签名 APK/,'manual check shows a real checking state');
 });
