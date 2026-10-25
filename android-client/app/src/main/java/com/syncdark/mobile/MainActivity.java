@@ -49,6 +49,12 @@ public final class MainActivity extends Activity {
         @Override public void onReceive(Context context, Intent intent) {
             if (NodeMeshService.ACTION_STATUS.equals(intent.getAction()) && nodeStatus != null) {
                 nodeStatus.setText(intent.getStringExtra(NodeMeshService.EXTRA_STATUS));
+                if (webView != null) {
+                    String peers = intent.getStringExtra(NodeMeshService.EXTRA_PEERS_JSON);
+                    if (peers == null) peers = NodeMeshService.getSnapshotJson();
+                    webView.evaluateJavascript("window.syncNearbyNodes && window.syncNearbyNodes(" +
+                            JSONObject.quote(peers) + ")", null);
+                }
             }
         }
     };
@@ -145,6 +151,32 @@ public final class MainActivity extends Activity {
     }
 
     private final class AndroidUpdaterBridge {
+        @JavascriptInterface public String getNearbyNodes() {
+            return NodeMeshService.getSnapshotJson();
+        }
+
+        @JavascriptInterface public void startNodeDiscovery() {
+            mainHandler.post(() -> {
+                if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4201);
+                }
+                try {
+                    Intent service = new Intent(MainActivity.this, NodeMeshService.class);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(service);
+                    else startService(service);
+                } catch (Exception error) {
+                    if (nodeStatus != null) nodeStatus.setText("附近节点启动失败：" + error.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @JavascriptInterface public void stopNodeDiscovery() {
+            mainHandler.post(() -> {
+                stopService(new Intent(MainActivity.this, NodeMeshService.class));
+                if (nodeStatus != null) nodeStatus.setText("节点服务已停止。");
+            });
+        }
+
         @JavascriptInterface public String getInstalledVersionInfo() {
             try {
                 android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
