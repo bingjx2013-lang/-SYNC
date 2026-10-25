@@ -47,42 +47,52 @@
 <section class="page" id="security"><div class="pagehead"><div><div class="eyebrow">SECURITY OBSERVABILITY / 07</div><h1>安全监测中心<span class="cyan">_</span></h1><p>监测本应用收到的可疑 HTTP 请求与聊天限流事件；不是全球攻击情报，也不是网络入侵的最终判定。</p></div><span class="tag" id="securityState">等待数据</span></div>
 <div class="grid stats"><div class="panel padded"><div class="statlabel">事件缓冲区 <span>LIVE</span></div><div class="statvalue cyan" id="secTotal">—</div><div class="tiny">最近保留的事件数量</div></div><div class="panel padded"><div class="statlabel">高风险线索 <span>HIGH</span></div><div class="statvalue" id="secHigh">—</div><div class="tiny">敏感路径/扫描特征</div></div><div class="panel padded"><div class="statlabel">中风险线索 <span>MEDIUM</span></div><div class="statvalue purple" id="secMedium">—</div><div class="tiny">请求突增或速率限制</div></div><div class="panel padded"><div class="statlabel">数据范围 <span>LOCAL</span></div><div class="statvalue" style="font-size:19px">应用层</div><div class="tiny">不是全网流量捕获</div></div></div>
 <div class="grid twocol"><div class="panel"><div class="sectiontitle"><span>SECURITY EVENT STREAM</span><div class="btnrow"><select class="field" id="securitySeverity" aria-label="风险等级" style="width:auto;padding:7px"><option value="">全部等级</option><option value="high">高风险</option><option value="medium">中风险</option><option value="low">低风险</option></select><select class="field" id="securityKind" aria-label="事件类型" style="width:auto;padding:7px"><option value="">全部类型</option><option value="suspicious_path">敏感路径扫描</option><option value="request_burst">请求突增</option><option value="unusual_method">异常方法</option><option value="chat_rate_limit">聊天限流</option><option value="invalid_chat_join">异常加入</option><option value="room_capacity">房间容量</option></select><button class="btn" id="securityExport">导出事件</button><button class="btn" id="securityRefresh">刷新</button></div></div><div id="securityEvents" class="feed"><div class="event"><p>等待服务器事件</p></div></div></div><div class="panel"><div class="sectiontitle"><span>DETECTION RULES</span><span>READ ONLY</span></div><div class="feed"><div class="event"><span class="stamp">HIGH</span><p>敏感路径扫描线索<small>例如 .env、.git、wp-admin、目录穿越特征</small></p></div><div class="event"><span class="stamp">MEDIUM</span><p>请求频率突增<small>同一来源标识 60 秒内达到 60 次请求</small></p></div><div class="event"><span class="stamp">MEDIUM</span><p>聊天速率限制<small>同一 WebSocket 连接 5 秒内超过 10 条消息</small></p></div><div class="event"><span class="stamp">LOW</span><p>异常聊天加入与容量限制<small>格式错误或房间满员的事件</small></p></div></div><div class="padded tiny">来源仅显示短哈希标识，不显示原始 IP。事件保存在当前进程内存中，服务重启后清空；检测结果只是线索，不代表已确认遭到攻击。</div></div></div>
-<div class="panel" style="margin-top:16px"><div class="sectiontitle"><span>THREAT INTELLIGENCE / CISA KEV</span><div class="btnrow"><span class="tag" id="kevState">等待数据</span><button class="btn" id="kevRefresh">刷新情报</button></div></div><div class="padded tiny">来自美国 CISA 已知遭到实际利用的漏洞目录；显示近 60 天新增条目。它是漏洞情报，不代表这些漏洞正在攻击本应用，也不会自动扫描或修补你的设备。</div><div class="grid stats"><div class="panel padded"><div class="statlabel">目录条目</div><div class="statvalue cyan" id="kevTotal">—</div></div><div class="panel padded"><div class="statlabel">近 60 天条目</div><div class="statvalue purple" id="kevRecent">—</div></div><div class="panel padded"><div class="statlabel">目录版本</div><div class="statvalue" style="font-size:16px" id="kevVersion">—</div></div></div><div id="kevItems" class="feed"><div class="event"><p>等待读取外部漏洞情报…</p></div></div><div class="padded tiny" id="kevFootnote">数据来源：CISA KEV Catalog · 失败时会显示上次成功缓存（如有）</div></div><div class="footnote" id="securityFootnote">等待读取 /api/security</div></section><section class="page" id="mobileapp" style="color:#172b4d">
-<div style="max-width:760px;margin:0 auto;background:#f4f6fb;color:#172b4d;border-radius:24px;overflow:hidden;box-shadow:0 12px 36px #0002;font-family:system-ui,-apple-system,'Noto Sans SC',sans-serif">
-  <div style="padding:24px 22px 10px;background:#f4f6fb">
-    <div style="display:flex;align-items:center;gap:14px;font-size:19px;font-weight:700"><span aria-hidden="true" style="font-size:28px;line-height:1">‹</span><span>版本更新</span><span style="margin-left:auto;font-size:11px;font-weight:600;letter-spacing:1px;color:#0b65df">SYNC CLIENT</span></div>
-    <div style="padding:42px 4px 20px"><h2 style="font-size:clamp(28px,5vw,38px);line-height:1.25;margin:0 0 14px;color:#142746;letter-spacing:1px">版本状态</h2><p id="appVersionState" style="font-size:15px;line-height:1.9;color:#687995;margin:0">正在检查最新版本…</p></div>
-  </div>
-  <div style="padding:0 18px 26px">
-    <div style="border:1.5px solid #d9e2f2;border-radius:22px;padding:23px 18px;display:grid;grid-template-columns:1fr 36px 1fr;align-items:center;background:#f8faff">
-      <div><div style="font-size:14px;color:#617493;margin-bottom:10px">当前客户端版本</div><strong id="appCurrent" style="font-size:26px;color:#142746">等待检测</strong></div>
-      <div style="font-size:25px;color:#6b7f9e;text-align:center">→</div>
-      <div><div style="font-size:14px;color:#617493;margin-bottom:10px">最新可用版本</div><strong id="appLatest" style="font-size:26px;color:#0969da">v0.5.0.0</strong></div>
-    </div>
-    <div style="background:white;border-radius:26px;padding:22px;margin-top:22px;box-shadow:0 1px 2px #132b4810">
-      <h3 style="margin:0 0 13px;font-size:19px;color:#172b4d">更新内容</h3>
-      <p id="appUpdateText" style="margin:0;color:#687995;line-height:1.9;font-size:15px">常规更新 · 聊天同步与连接稳定性优化</p>
-      <p style="font-size:12px;color:#8795aa;margin:12px 0 0">服务端版本：<span id="serverVersion">正在读取…</span></p>
-    </div>
-    <div style="margin-top:26px">
-      <h3 id="appDownloadTitle" style="font-size:22px;margin:0 0 15px;color:#172b4d">安装包准备情况</h3>
-      <div style="height:10px;border-radius:99px;background:#dce5f4;overflow:hidden"><div id="appProgress" style="height:100%;width:0;background:#0969ef;border-radius:99px;transition:width .25s"></div></div>
-      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:11px;color:#536783;font-size:13px"><span id="appDownloadStatus">点击下方按钮获取 APK 安装包</span><span id="appProgressText">待下载</span></div>
-    </div>
-    <p style="margin:28px 4px 20px;color:#71819b;line-height:1.9;font-size:13px">安装前会由 Android 系统验证应用，请根据系统提示完成安装。此客户端需要联网连接测试服务器。</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 5px">
-      <button class="btn" id="appRefresh" style="background:transparent;border:0;color:#0969da;font-weight:700;font-size:15px;padding:12px">检查更新</button>
-      <button class="btn" id="appWebsite" style="background:transparent;border:0;color:#0969da;font-weight:700;font-size:15px;padding:12px">访问官网</button>
-    </div>
-    <p id="apkVersionInfo" aria-live="polite" style="font-size:12px;line-height:1.8;color:#7c8ca4;text-align:center;margin:12px 4px 0">正在读取已发布安装包版本…</p>
-    <div style="font-size:12px;color:#7c8ca4;text-align:center;margin:12px 0 0">ANDROID APK / 测试渠道</div>
-  </div>
-  <div style="padding:20px 18px 25px;background:#fff;border-top:1px solid #dce4f0">
-    <button class="btn" id="appInstall" style="width:100%;border:0;border-radius:19px;padding:20px 14px;background:#0969ef;color:white;font-weight:750;font-size:18px;box-shadow:0 5px 14px #0969ef28">⇩　获取 Android 安装包</button>
-    <p style="text-align:center;color:#7c8ca4;font-size:12px;line-height:1.8;margin:15px 4px 0">下载完成后，在手机通知栏或“文件管理”中打开 APK 安装。若 Android 提示允许安装未知应用，请仅对你信任的来源授权。</p>
-  </div>
+<div class="panel" style="margin-top:16px"><div class="sectiontitle"><span>THREAT INTELLIGENCE / CISA KEV</span><div class="btnrow"><span class="tag" id="kevState">等待数据</span><button class="btn" id="kevRefresh">刷新情报</button></div></div><div class="padded tiny">来自美国 CISA 已知遭到实际利用的漏洞目录；显示近 60 天新增条目。它是漏洞情报，不代表这些漏洞正在攻击本应用，也不会自动扫描或修补你的设备。</div><div class="grid stats"><div class="panel padded"><div class="statlabel">目录条目</div><div class="statvalue cyan" id="kevTotal">—</div></div><div class="panel padded"><div class="statlabel">近 60 天条目</div><div class="statvalue purple" id="kevRecent">—</div></div><div class="panel padded"><div class="statlabel">目录版本</div><div class="statvalue" style="font-size:16px" id="kevVersion">—</div></div></div><div id="kevItems" class="feed"><div class="event"><p>等待读取外部漏洞情报…</p></div></div><div class="padded tiny" id="kevFootnote">数据来源：CISA KEV Catalog · 失败时会显示上次成功缓存（如有）</div></div><div class="footnote" id="securityFootnote">等待读取 /api/security</div></section><section class="page" id="mobileapp">
+<div class="pagehead"><div><div class="eyebrow">SYNC CLIENT / RELEASE CENTER</div><h1>安装包与版本更新<span class="cyan">_</span></h1><p>检查版本、核对安装包、查看下载进度；安装仍由 Android 系统确认。</p></div><span class="tag">ANDROID · APK</span></div>
+<div class="update-shell">
+<style>
+.update-shell{max-width:900px;margin:0 auto;color:#eaf3ff;font-family:system-ui,-apple-system,'Noto Sans SC',sans-serif}
+.update-hero{position:relative;overflow:hidden;border:1px solid #29435c;border-radius:24px;padding:24px;background:radial-gradient(ellipse at 85% 0%,#254f7c66,transparent 42%),linear-gradient(135deg,#101c2c,#080e18 75%);box-shadow:0 18px 55px #0004}
+.update-brand{display:flex;align-items:center;gap:12px}.update-mark{width:48px;height:48px;display:grid;place-items:center;border:1px solid #3b86bb;border-radius:16px;background:#0c243a;color:#69dcff;font-size:22px;font-weight:900}.update-brand strong{display:block;font-size:17px;letter-spacing:.5px}.update-brand small{display:block;color:#8da6c0;font-size:11px;margin-top:3px;letter-spacing:1.2px}
+.update-state{display:inline-flex;align-items:center;gap:8px;border:1px solid #31536e;border-radius:99px;padding:7px 11px;margin-top:22px;background:#0b1a29;color:#a7dfff;font-size:12px}.update-led{width:7px;height:7px;border-radius:50%;background:#4de4b2;box-shadow:0 0 10px #4de4b2}
+.update-hero h2{font-size:clamp(25px,4vw,36px);line-height:1.2;margin:17px 0 9px;letter-spacing:-.8px}.update-copy{color:#a9bbce;line-height:1.8;font-size:14px;margin:0;max-width:650px}
+.update-versions{display:grid;grid-template-columns:1fr 36px 1fr;gap:10px;align-items:center;margin-top:24px}.update-version{border:1px solid #24394e;border-radius:16px;background:#0a1421c9;padding:16px;min-width:0}.update-version label{display:block;color:#91a6bd;font-size:12px;margin-bottom:8px}.update-version strong{display:block;font-size:clamp(19px,3vw,25px);overflow-wrap:anywhere;color:#e9f7ff}.update-arrow{text-align:center;color:#61cfff;font-size:22px}
+.update-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.update-card{border:1px solid #26394c;border-radius:18px;background:linear-gradient(145deg,#101a28,#0a101a);padding:18px;min-width:0}.update-card h3{font-size:14px;margin:0 0 12px;color:#d9e9f9}.update-card p{font-size:13px;line-height:1.8;color:#9eb1c7;margin:0}.update-meta{display:grid;gap:9px}.update-meta div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #1e2b3b;padding-bottom:8px;font-size:12px}.update-meta div:last-child{border:0;padding-bottom:0}.update-meta span{color:#8ea3b9}.update-meta strong{color:#dcecff;text-align:right;overflow-wrap:anywhere;font-weight:600}
+.update-progress{height:10px;border-radius:99px;background:#1b2a3b;overflow:hidden;margin:16px 0 10px;border:1px solid #26394d}.update-progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#1ea8ff,#55f0c0);box-shadow:0 0 15px #24c8ff55;transition:width .25s}
+.update-progressrow{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#9eb4ca}.update-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.update-btn{border-radius:13px;padding:13px 15px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;border:1px solid #35516b;background:#122238;color:#d5eaff}.update-btn.primary{border-color:#44bfff;background:linear-gradient(120deg,#1687db,#2458c8);color:white;box-shadow:0 8px 22px #1469cb33}.update-btn:disabled{opacity:.55;cursor:wait}.update-foot{font-size:11px;line-height:1.8;color:#8197af;margin:14px 2px 0}
+@media(max-width:600px){.update-hero{padding:18px;border-radius:19px}.update-cards{grid-template-columns:1fr}.update-version{padding:12px}.update-actions{grid-template-columns:1fr}.update-versions{grid-template-columns:1fr 24px 1fr}.update-hero h2{font-size:27px}}
+</style>
+<div class="update-hero">
+ <div class="update-brand"><div class="update-mark">S</div><div><strong>暗域 · SYNC</strong><small>SECURE CLIENT / UPDATE CENTER</small></div></div>
+ <div class="update-state"><i class="update-led"></i><span id="appVersionState" aria-live="polite">正在检查最新版本…</span></div>
+ <h2>保持客户端处于最新状态。</h2>
+ <p class="update-copy" id="appUpdateText">检查已发布版本与本机版本；下载后核对文件完整性，再交给 Android 系统安装。</p>
+ <div class="update-versions">
+  <div class="update-version"><label>本机已安装</label><strong id="appCurrent">读取中…</strong></div><div class="update-arrow" aria-hidden="true">→</div>
+  <div class="update-version"><label>最新可用 APK</label><strong id="appLatest">检查中…</strong></div>
+ </div>
 </div>
-<div class="footnote" style="color:#718399">网页版本状态来自 /api/status；Android 安装包版本来自 /api/android/version。固定下载地址 /api/download/android.apk 会提供最近一次成功发布的安装包。下载后仍需由 Android 系统确认安装，网页不能静默替手机升级。</div>
+<div class="update-cards">
+ <div class="update-card"><h3>安装包信息</h3><div class="update-meta">
+  <div><span>安装包版本</span><strong id="apkVersionLabel">等待检查</strong></div>
+  <div><span>构建号</span><strong id="apkBuildLabel">—</strong></div>
+  <div><span>安装包大小</span><strong id="apkSizeLabel">—</strong></div>
+  <div><span>发布渠道</span><strong>Android 测试渠道</strong></div>
+  <div><span>服务器版本</span><strong id="serverVersion">读取中…</strong></div>
+ </div></div>
+ <div class="update-card"><h3 id="appDownloadTitle">下载与完整性校验</h3>
+  <p>下载过程显示实际进度。下载结束后会核对文件大小与 SHA-256；任何一项不一致都会中止，不会把损坏的安装包当作成功。</p>
+  <div class="update-progress" role="progressbar" aria-label="APK 下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="appProgress"></span></div>
+  <div class="update-progressrow"><span id="appDownloadStatus" aria-live="polite">等待检查安装包</span><strong id="appProgressText">0%</strong></div>
+ </div>
+</div>
+<div class="update-actions">
+ <button class="update-btn" id="appRefresh">⟳　检查更新</button>
+ <button class="update-btn primary" id="appInstall">↓　下载并安装 APK</button>
+</div>
+<p id="apkVersionInfo" aria-live="polite" class="update-foot">正在读取版本清单与 SHA-256 信息…</p>
+<p class="update-foot">安全说明：当前没有已发布的签名 APK 时，页面会如实提示，不会显示虚假的下载成功。安装需要 Android 系统确认；网页不能静默安装或绕过系统安全提示。测试版与正式版签名不同的情况下，可能无法覆盖安装。</p>
+</div>
 </section><section class="page" id="tools"><div class="pagehead"><div><div class="eyebrow">SYSTEM UTILITIES / 05</div><h1>系统工具箱<span class="cyan">_</span></h1><p>常用编码与校验工具，全部在本地浏览器执行。</p></div><span class="tag">CLIENT SIDE</span></div>
 <div class="grid toolgrid">
 <div class="panel toolcard"><div class="bigicon">#</div><h3>SHA-256 哈希校验</h3><textarea class="field" id="hashInput" rows="3" placeholder="输入文本以生成 SHA-256"></textarea><button class="btn" id="hashBtn">计算摘要</button><div class="result" id="hashOut">等待输入…</div><small class="tiny">Web Crypto API · 不上传内容</small></div>
