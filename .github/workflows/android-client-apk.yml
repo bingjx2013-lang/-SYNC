@@ -18,6 +18,8 @@ concurrency:
 
 jobs:
   build-signed-apk:
+    # The publisher writes to the Render-connected release branch; never run it from a feature/PR branch.
+    if: github.ref == 'refs/heads/feature/live-refresh-3d-globe'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout test branch
@@ -81,6 +83,31 @@ jobs:
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
 
+      - name: Generate release metadata for the stable download button
+        shell: bash
+        run: |
+          APK="android-client/app/build/outputs/apk/release/app-release.apk"
+          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\\1/p" android-client/app/build.gradle | tail -n 1)"
+          VERSION_CODE="$(sed -nE "s/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\\1/p" android-client/app/build.gradle | tail -n 1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          SIZE_BYTES="$(wc -c < "$APK" | tr -d ' ')"
+          PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p syncdark/public/downloads
+          node - "$VERSION_NAME" "$VERSION_CODE" "$SHA256" "$SIZE_BYTES" "$PUBLISHED_AT" <<'NODE'
+          const fs = require('node:fs');
+          const [versionName, versionCode, sha256, sizeBytes, publishedAt] = process.argv.slice(2);
+          fs.writeFileSync('syncdark/public/downloads/android-version.json', JSON.stringify({
+            status: 'available',
+            versionName,
+            versionCode: Number(versionCode),
+            sha256,
+            sizeBytes: Number(sizeBytes),
+            publishedAt
+          }, null, 2) + '\n');
+          NODE
+
       - name: Publish APK for direct website download
         shell: bash
         run: |
@@ -88,7 +115,7 @@ jobs:
           cp android-client/app/build/outputs/apk/release/app-release.apk syncdark/public/downloads/syncdark-android-test.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add syncdark/public/downloads/syncdark-android-test.apk
+          git add syncdark/public/downloads/syncdark-android-test.apk syncdark/public/downloads/android-version.json
           if git diff --cached --quiet; then
             echo "APK binary is unchanged."
           else

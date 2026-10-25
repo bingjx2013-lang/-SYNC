@@ -1,0 +1,51 @@
+name: SYNC server regression tests
+
+on:
+  push:
+    branches:
+      - feat/android-mesh-native-2026-10
+    paths:
+      - 'syncdark/server.js'
+      - 'syncdark/server.test.js'
+      - 'syncdark/package.json'
+      - 'syncdark/package-lock.json'
+      - '.github/workflows/server-regression-tests.yml'
+  pull_request:
+    branches:
+      - feat/android-mesh-native-2026-10
+    paths:
+      - 'syncdark/server.js'
+      - 'syncdark/server.test.js'
+      - 'syncdark/package.json'
+      - 'syncdark/package-lock.json'
+      - '.github/workflows/server-regression-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: syncdark-server-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: syncdark
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: syncdark/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Check JavaScript syntax
+        run: node --check server.js && node --check public/mobile-client.js
+      - name: Run server regression suite
+        run: npm test

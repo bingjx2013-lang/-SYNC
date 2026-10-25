@@ -1,0 +1,44 @@
+name: SYNC Android mesh build
+
+on:
+  push:
+    branches:
+      - feat/android-mesh-native-2026-10
+    paths:
+      - 'android-client/**'
+      - '.github/workflows/android-mesh-regression.yml'
+  pull_request:
+    branches:
+      - feat/android-mesh-native-2026-10
+    paths:
+      - 'android-client/**'
+      - '.github/workflows/android-mesh-regression.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: syncdark-android-mesh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compile Android debug APK
+        working-directory: android-client
+        run: gradle --no-daemon assembleDebug
+      - name: Confirm debug APK exists
+        run: test -s android-client/app/build/outputs/apk/debug/app-debug.apk
