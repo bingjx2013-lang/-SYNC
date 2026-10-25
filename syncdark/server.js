@@ -123,6 +123,30 @@ const srv=http.createServer((req,res)=>{
     nodeProbeInFlight.then(nodes=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});
     return
   }
+  if(req.url.split('?')[0]==='/api/ops'){
+    const now=Date.now(),mem=process.memoryUsage();
+    const severityCounts={high:0,medium:0,low:0};
+    for(const event of securityEvents)if(Object.hasOwn(severityCounts,event.severity))severityCounts[event.severity]++;
+    const nodeAgeMs=nodeSnapshotAt?Math.max(0,now-nodeSnapshotAt):null;
+    const threatAgeMs=kevCache.fetchedAt?Math.max(0,now-kevCache.fetchedAt):null;
+    const configuredRedis=!!process.env.REDIS_URL,configuredPostgres=!!process.env.DATABASE_URL;
+    const degraded=(configuredRedis&&!redisReady)||(configuredPostgres&&!pgReady);
+    const status={
+      status:degraded?'degraded':'ok',
+      checkedAt:now,
+      scope:'read-only process diagnostics; security counts cover current-process memory only',
+      dependencies:{
+        redis:{configured:configuredRedis,connected:redisReady,status:!configuredRedis?'not_configured':redisReady?'connected':'unavailable_or_connecting'},
+        postgres:{configured:configuredPostgres,ready:pgReady,status:!configuredPostgres?'not_configured':pgReady?'ready':'unavailable_or_initializing'},
+        websocket:{connectedClients:[...wss.clients].filter(c=>c.readyState===1).length,activeRooms:rooms.size}
+      },
+      process:{uptimeSeconds:Math.floor(process.uptime()),rssMb:Number((mem.rss/1048576).toFixed(1)),heapUsedMb:Number((mem.heapUsed/1048576).toFixed(1)),heapTotalMb:Number((mem.heapTotal/1048576).toFixed(1))},
+      probes:{status:!nodeSnapshot?'not_checked':nodeAgeMs<=30000?'fresh':'stale',count:nodeSnapshot?nodeSnapshot.length:0,checkedAt:nodeSnapshotAt||null,ageMs:nodeAgeMs,inFlight:!!nodeProbeInFlight},
+      threatIntel:{status:!kevCache.fetchedAt?(kevInFlight?'checking':'not_checked'):kevCache.error?'stale':'fresh',cachedItems:Array.isArray(kevCache.items)?kevCache.items.length:0,fetchedAt:kevCache.fetchedAt||null,ageMs:threatAgeMs},
+      security:{scope:'current-process-memory-only',events:securityEvents.length,severityCounts,trackedRequestSources:requestWindows.size,retentionLimit:250}
+    };
+    res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify(status));return
+  }
   if(req.url==='/api/status'){
     const now=Date.now(),elapsed=Math.max(1,now-lastCpuAt),delta=process.cpuUsage(lastCpu);
     const cpuPercent=Math.min(100,Math.max(0,((delta.user+delta.system)/1000/elapsed)*100));
