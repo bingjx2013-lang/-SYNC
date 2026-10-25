@@ -165,6 +165,7 @@ test('Android release version follows the four-part version policy and adaptive 
   assert.match(gradle,/versionCode\s+5000000/);
   assert.match(gradle,/versionName\s+'v0\.5\.0\.0'/);
   assert.match(manifest,/android:icon="@mipmap\/ic_launcher"/);
+  assert.ok(fs.existsSync(path.join(__dirname,'..','android-client','app','src','main','res','mipmap','ic_launcher.xml')),'legacy launcher icon fallback should exist');
   assert.match(manifest,/android\.support\.FILE_PROVIDER_PATHS/);
   assert.ok(updater.includes('targetVersionFormat'), 'client validates four-part version names');
   assert.match(updater,/SHA-256/);
