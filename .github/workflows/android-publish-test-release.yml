@@ -1,0 +1,119 @@
+name: Publish signed SYNC Android test release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: syncdark-android-test-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/feat/android-mesh-native-2026-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/android-mesh-native-2026-10
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Validate release version and protected signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\\1/p" android-client/app/build.gradle | head -n1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\\1/p' android-client/app/build.gradle | head -n1)"
+          [[ "$VERSION_NAME" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || { echo "::error::versionName must use vA.B.C.D"; exit 1; }
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || { echo "::error::versionCode must be a positive integer"; exit 1; }
+          [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD" && "$KEY_ALIAS" == "syncdark-release" && -n "$KEY_PASSWORD" ]] || { echo "::error::Required signing secrets are missing or alias is unexpected; secret values were not printed."; exit 1; }
+          if gh release view "$VERSION_NAME" >/dev/null 2>&1; then
+            echo "::error::A release with this version already exists. Increase versionName/versionCode on the feature branch before publishing again."
+            exit 1
+          fi
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Decode and validate signing keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/syncdark-signing"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12"
+          chmod 600 "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12" -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+
+      - name: Build signed release APK
+        working-directory: android-client
+        env:
+          SYNCDARK_KEYSTORE_FILE: ${{ runner.temp }}/syncdark-signing/syncdark-release.p12
+          SYNCDARK_KEYSTORE_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEYSTORE_PASSWORD }}
+          SYNCDARK_KEY_ALIAS: ${{ secrets.SYNCDARK_ANDROID_KEY_ALIAS }}
+          SYNCDARK_KEY_PASSWORD: ${{ secrets.SYNCDARK_ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify signature and create version manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android-client/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print -quit)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          mkdir -p "$RUNNER_TEMP/syncdark-release"
+          cp "$APK" "$RUNNER_TEMP/syncdark-release/syncdark-android.apk"
+          APK="$RUNNER_TEMP/syncdark-release/syncdark-android.apk"
+          SIZE="$(stat -c '%s' "$APK")"
+          HASH="$(sha256sum "$APK" | awk '{print $1}')"
+          PUBLISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1],JSON.stringify({versionName:process.env.VERSION_NAME,versionCode:Number(process.env.VERSION_CODE),sizeBytes:Number(process.env.SIZE_BYTES),sha256:process.env.APK_SHA256,publishedAt:process.env.PUBLISHED_AT},null,2)+"\\n")' "$RUNNER_TEMP/syncdark-release/android-version.json"
+        env:
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          SIZE_BYTES: ${{ steps.release-meta.outputs.size || '0' }}
+          APK_SHA256: ${{ steps.release-meta.outputs.sha256 || '' }}
+          PUBLISHED_AT: ${{ steps.release-meta.outputs.published_at || '' }}
+
+      - name: Create public prerelease with signed APK and manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$VERSION_NAME" \
+            "$RUNNER_TEMP/syncdark-release/syncdark-android.apk#SYNC Android APK" \
+            "$RUNNER_TEMP/syncdark-release/android-version.json#Android version manifest" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target feat/android-mesh-native-2026-10 \
+            --title "SYNC Android $VERSION_NAME" \
+            --notes "Signed test prerelease built from feat/android-mesh-native-2026-10. The updater verifies APK size and SHA-256 before use. This is a test prerelease, not a production deployment." \
+            --prerelease
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/syncdark-signing" "$RUNNER_TEMP/syncdark-release" android-client/.signing
