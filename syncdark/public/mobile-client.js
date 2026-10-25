@@ -17,9 +17,14 @@
     const progress = $('#appProgress');
     const statusEl = $('#appDownloadStatus');
     const progressText = $('#appProgressText');
-    if (progress) progress.style.width = Math.max(0, Math.min(100, percent)) + '%';
+    const bounded = Math.max(0, Math.min(100, percent));
+    if (progress) {
+      progress.style.width = bounded + '%';
+      const track = progress.closest('[role="progressbar"]');
+      if (track) track.setAttribute('aria-valuenow', String(bounded));
+    }
     if (statusEl) statusEl.textContent = status;
-    if (progressText) progressText.textContent = percent < 0 ? '下载中' : percent + '%';
+    if (progressText) progressText.textContent = percent < 0 ? '处理中' : bounded + '%';
     if (title) text('appDownloadTitle', title);
   }
 
@@ -92,7 +97,11 @@
       ? (latestApk.sizeBytes / 1048576).toFixed(1) + ' MB'
       : Math.ceil(latestApk.sizeBytes / 1024) + ' KB';
     const published = data.publishedAt ? new Date(data.publishedAt).toLocaleString() : '时间未知';
-    text('apkVersionInfo', '已发布：' + data.versionName + '（构建号 ' + data.versionCode + '） · ' + size + ' · SHA-256 已登记 · ' + published);
+    text('apkVersionInfo', '已发布：' + data.versionName + '（构建号 ' + data.versionCode + '） · ' + size + ' · SHA-256 已登记 · 发布时间：' + published);
+    text('apkVersionLabel', data.versionName);
+    text('apkBuildLabel', String(data.versionCode));
+    text('apkSizeLabel', size);
+    setProgress(0, '安装包信息已验证，等待下载', '下载与完整性校验');
     versionSummary();
     return latestApk;
   }
@@ -203,7 +212,13 @@
   loadVersions();
   loadApkVersion().catch(error => {
     text('apkVersionInfo', '尚无可供下载的签名 APK：' + (error.message || '版本接口暂不可用'));
-    text('appVersionState', '等待发布四段式版本的签名 APK');
+    text('appVersionState', '暂未发布可下载的签名 APK');
+    text('appLatest', '暂无发布');
+    text('appUpdateText', '版本接口没有找到带有效版本清单的发布包。请稍后重新检查；不会伪造更新或下载成功。');
+    text('apkVersionLabel', '尚未发布');
+    text('apkBuildLabel', '—');
+    text('apkSizeLabel', '—');
+    setProgress(0, '尚未发布可下载的 APK', '等待正式测试发布');
   });
   window.addEventListener('pageshow', () => {
     installed = readInstalledVersion();
