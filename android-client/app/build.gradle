@@ -15,8 +15,8 @@ android {
         // Canonical release format: vA.B.C.D; this feature release advances B.
         // Android update ordering uses a monotonic integer.
         // Legacy icon fallback is included for Android API 23-25.
-        versionCode 6000001
-        versionName 'v0.6.0.1'
+        versionCode 6000002
+        versionName 'v0.6.0.2'
     }
 
     signingConfigs {
