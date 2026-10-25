@@ -105,7 +105,7 @@ jobs:
             sha256,
             sizeBytes: Number(sizeBytes),
             publishedAt
-          }, null, 2) + '\\n');
+          }, null, 2) + '\n');
           NODE
 
       - name: Publish APK for direct website download
