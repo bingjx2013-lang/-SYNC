@@ -83,7 +83,7 @@ async function getAndroidRelease(force=false){
     if(!response.ok)throw new Error('GitHub release API HTTP '+response.status);
     const releases=await response.json();
     if(!Array.isArray(releases))throw new Error('Invalid GitHub releases response');
-    const candidates=releases.filter(r=>r&&!r.draft&&/^v\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(String(r.tag_name||''))&&Array.isArray(r.assets))
+    const candidates=releases.filter(r=>r&&!r.draft&&/^v\d+\.\d+\.\d+\.\d+$/.test(String(r.tag_name||''))&&Array.isArray(r.assets))
       .sort((a,b)=>Date.parse(b.published_at||b.created_at||0)-Date.parse(a.published_at||a.created_at||0));
     for(const release of candidates){
       const apkAsset=release.assets.find(a=>a.name==='syncdark-android.apk'&&Number(a.size)>0&&typeof a.browser_download_url==='string');
@@ -93,7 +93,7 @@ async function getAndroidRelease(force=false){
       if(!metaResponse.ok)continue;
       let metadata;try{metadata=await metaResponse.json()}catch{continue}
       const valid=metadata&&metadata.versionName===release.tag_name&&
-        /^v\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(String(metadata.versionName||''))&&
+        /^v\d+\.\d+\.\d+\.\d+$/.test(String(metadata.versionName||''))&&
         Number.isSafeInteger(Number(metadata.versionCode))&&Number(metadata.versionCode)>0&&
         Number.isSafeInteger(Number(metadata.sizeBytes))&&Number(metadata.sizeBytes)===Number(apkAsset.size)&&
         /^[a-f0-9]{64}$/.test(String(metadata.sha256||''))&&Number.isFinite(Date.parse(metadata.publishedAt||release.published_at||''));
