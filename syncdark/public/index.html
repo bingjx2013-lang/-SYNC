@@ -55,9 +55,9 @@
   </div>
   <div style="padding:0 18px 26px">
     <div style="border:1.5px solid #d9e2f2;border-radius:22px;padding:23px 18px;display:grid;grid-template-columns:1fr 36px 1fr;align-items:center;background:#f8faff">
-      <div><div style="font-size:14px;color:#617493;margin-bottom:10px">网页服务版本</div><strong id="appCurrent" style="font-size:26px;color:#142746">v0.3.3.2</strong></div>
+      <div><div style="font-size:14px;color:#617493;margin-bottom:10px">当前客户端版本</div><strong id="appCurrent" style="font-size:26px;color:#142746">等待检测</strong></div>
       <div style="font-size:25px;color:#6b7f9e;text-align:center">→</div>
-      <div><div style="font-size:14px;color:#617493;margin-bottom:10px">网页登记版本</div><strong id="appLatest" style="font-size:26px;color:#0969da">v0.3.3.2</strong></div>
+      <div><div style="font-size:14px;color:#617493;margin-bottom:10px">最新可用版本</div><strong id="appLatest" style="font-size:26px;color:#0969da">v0.5.0.0</strong></div>
     </div>
     <div style="background:white;border-radius:26px;padding:22px;margin-top:22px;box-shadow:0 1px 2px #132b4810">
       <h3 style="margin:0 0 13px;font-size:19px;color:#172b4d">更新内容</h3>
@@ -184,4 +184,4 @@ $('#globalStatus').textContent='UI READY';
 
 // Higher-resolution world coastlines from the public world-atlas / Natural Earth dataset; stylized fallback remains if offline.
 (function loadWorldCoastlines(){const topo=document.createElement('script');topo.src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';topo.onload=()=>fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',{cache:'force-cache'}).then(r=>{if(!r.ok)throw Error('world map HTTP '+r.status);return r.json()}).then(t=>{if(window.topojson&&t.objects&&t.objects.countries){worldCountries=window.topojson.feature(t,t.objects.countries).features;drawGlobe()}}).catch(()=>{});topo.onerror=()=>{};document.head.appendChild(topo)})();
-</script><script src="/chat-enhancements.js" defer></script><script src="/mobile-client.js?v=9" defer></script></body></html>
+</script><script src="/chat-enhancements.js" defer></script><script src="/mobile-client.js?v=10" defer></script></body></html>
