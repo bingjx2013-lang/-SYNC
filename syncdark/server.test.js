@@ -70,7 +70,7 @@ test('Android APK version metadata is explicit and never cached',async()=>{
   const data=await r.json();
   if(r.status===200){
     assert.equal(data.status,'available');
-    assert.match(data.versionName,/^[A-Za-z0-9._+-]{1,64}$/);
+    assert.match(data.versionName,/^v\\d+\\.\\d+\\.\\d+\\.\\d+$/,'APK version must follow vA.B.C.D');
     assert.ok(Number.isSafeInteger(data.versionCode)&&data.versionCode>0);
     assert.match(data.sha256,/^[a-f0-9]{64}$/);
     assert.ok(Number.isSafeInteger(data.sizeBytes)&&data.sizeBytes>0);
@@ -155,4 +155,18 @@ test('security history API supports severity, event-kind and limit filters',asyn
   assert.equal(data.filters.limit,5);
   assert.ok(data.events.length<=5);
   for(const e of data.events){assert.equal(e.severity,'high');assert.equal(e.kind,'suspicious_path')}
+});
+
+
+test('Android release version follows the four-part version policy and adaptive icon is configured',()=>{
+  const gradle=fs.readFileSync(path.join(__dirname,'..','android-client','app','build.gradle'),'utf8');
+  const manifest=fs.readFileSync(path.join(__dirname,'..','android-client','app','src','main','AndroidManifest.xml'),'utf8');
+  const updater=fs.readFileSync(path.join(__dirname,'public','mobile-client.js'),'utf8');
+  assert.match(gradle,/versionCode\s+5000000/);
+  assert.match(gradle,/versionName\s+'v0\.5\.0\.0'/);
+  assert.match(manifest,/android:icon="@mipmap\/ic_launcher"/);
+  assert.match(manifest,/android\.support\.FILE_PROVIDER_PATHS/);
+  assert.ok(updater.includes('targetVersionFormat'), 'client validates four-part version names');
+  assert.match(updater,/SHA-256/);
+  assert.match(updater,/downloadAndInstall/);
 });
