@@ -117,6 +117,8 @@ test('live node probes return real endpoint results without caching',async()=>{
   assert.match(data.source,/public HTTPS probes/);
   for(const n of data.nodes){
     assert.equal(n.kind,'public_endpoint_probe');
+    assert.equal(typeof n.lat,'number');
+    assert.equal(typeof n.lon,'number');
     for(const key of ['id','name','provider','category','lat','lon','endpoint','ok','status','latencyMs','checkedAt'])assert.ok(key in n,'missing '+key);
     assert.ok(n.ok===true||n.ok===false,'probe must report a real boolean result');
   }
