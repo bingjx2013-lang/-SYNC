@@ -183,4 +183,5 @@ test('Android release version follows the four-part version policy and adaptive 
   assert.match(updater,/release_service_unavailable/,'service outage is not mislabeled as an unpublished release');
   assert.match(updater,/检查失败，没有开始下载/,'failed update check resets progress honestly');
   assert.match(updater,/正在查询最新签名 APK/,'manual check shows a real checking state');
+  assert.match(updater,/latestApk = null;/,'a failed refresh cannot leave stale release metadata displayed');
 });
