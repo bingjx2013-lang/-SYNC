@@ -72,12 +72,12 @@ jobs:
           test -s "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12"
           if ! keytool -list -keystore "$RUNNER_TEMP/syncdark-signing/syncdark-release.p12" \
             -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" \
-            >"$RUNNER_TEMP/syncdark-signing/keytool.stdout" 2>"$RUNNER_TEMP/syncdark-signing/keytool.stderr"; then
-            if grep -Eqi 'password was incorrect|tampered with' "$RUNNER_TEMP/syncdark-signing/keytool.stderr"; then
+            >"$RUNNER_TEMP/syncdark-signing/keytool.stdout" 2>"$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
+            if grep -Eqi 'password was incorrect|tampered with' "$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
               echo "::error::Keystore password check failed. Confirm SYNCDARK_ANDROID_KEYSTORE_PASSWORD matches the original key file's store password."
-            elif grep -Eqi 'does not exist|not found|no such alias' "$RUNNER_TEMP/syncdark-signing/keytool.stderr"; then
+            elif grep -Eqi 'does not exist|not found|no such alias' "$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
               echo "::error::The alias was not found in the decoded keystore. Confirm SYNCDARK_ANDROID_KEY_ALIAS is syncdark-release and the Base64 secret belongs to this keystore."
-            elif grep -Eqi 'invalid|malformed|keystore' "$RUNNER_TEMP/syncdark-signing/keytool.stderr"; then
+            elif grep -Eqi 'invalid|malformed|keystore' "$RUNNER_TEMP/syncdark-signing/keytool.stderr" "$RUNNER_TEMP/syncdark-signing/keytool.stdout"; then
               echo "::error::The decoded signing file could not be read as PKCS12. Re-copy the Base64 secret from the original keystore file."
             else
               echo "::error::Keystore validation failed. Raw keytool output is withheld to avoid exposing sensitive metadata."
