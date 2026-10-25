@@ -131,6 +131,41 @@ const srv=http.createServer((req,res)=>{
     const connectedClients=[...wss.clients].filter(c=>c.readyState===1).length;
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({uptimeSeconds:Math.floor(process.uptime()),cpuPercent:Number(cpuPercent.toFixed(1)),rssMb:Number((mem.rss/1048576).toFixed(1)),heapUsedMb:Number((mem.heapUsed/1048576).toFixed(1)),heapTotalMb:Number((mem.heapTotal/1048576).toFixed(1)),connectedClients,rooms:rooms.size,appVersion:'v0.3.3.2',latestAppVersion:'v0.3.3.2',serverVersion:'1.0.4',timestamp:now}));return
   }
+  if(req.url.split('?')[0]==='/api/android/version'){
+    const jsonHeaders={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
+    const unavailable=()=>{
+      if(!res.headersSent)res.writeHead(503,jsonHeaders);
+      if(!res.writableEnded)res.end(JSON.stringify({status:'unavailable',error:'Android 安装包版本信息暂不可用。'}));
+    };
+    if(req.method!=='GET'&&req.method!=='HEAD'){
+      res.writeHead(405,{...jsonHeaders,'Allow':'GET, HEAD'}).end(JSON.stringify({status:'unavailable',error:'Method not allowed'}));
+      return
+    }
+    const metadataPath=path.join(PUB,'downloads','android-version.json');
+    const apkPath=path.join(PUB,'downloads','syncdark-android-test.apk');
+    fs.readFile(metadataPath,'utf8',(metadataError,raw)=>{
+      if(metadataError){unavailable();return}
+      let metadata;
+      try{metadata=JSON.parse(raw)}catch{unavailable();return}
+      fs.stat(apkPath,(statError,stat)=>{
+        const versionName=metadata&&metadata.versionName;
+        const versionCode=Number(metadata&&metadata.versionCode);
+        const sizeBytes=Number(metadata&&metadata.sizeBytes);
+        const sha256=String(metadata&&metadata.sha256||'');
+        const publishedAt=String(metadata&&metadata.publishedAt||'');
+        const valid=!statError&&stat.isFile()&&stat.size>0&&
+          typeof versionName==='string'&&/^[A-Za-z0-9._+-]{1,64}$/.test(versionName)&&
+          Number.isSafeInteger(versionCode)&&versionCode>0&&
+          Number.isSafeInteger(sizeBytes)&&sizeBytes===stat.size&&
+          /^[a-f0-9]{64}$/i.test(sha256)&&Number.isFinite(Date.parse(publishedAt));
+        if(!valid){unavailable();return}
+        const payload={status:'available',versionName,versionCode,sha256:sha256.toLowerCase(),sizeBytes,publishedAt,downloadUrl:'/api/download/android.apk'};
+        res.writeHead(200,jsonHeaders);
+        res.end(req.method==='HEAD'?'':JSON.stringify(payload));
+      });
+    });
+    return
+  }
   if(req.url.split('?')[0]==='/api/download/android.apk'){
     const apkPath=path.join(PUB,'downloads','syncdark-android-test.apk');
     fs.stat(apkPath,(error,stat)=>{
