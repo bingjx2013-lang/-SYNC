@@ -12,8 +12,10 @@ android {
         applicationId 'com.syncdark.mobile'
         minSdk 23
         targetSdk 35
-        versionCode 3333
-        versionName '0.4.0-mesh1'
+        // Canonical release format: vA.B.C.D; this feature release advances B.
+        // Android update ordering uses a monotonic integer.
+        versionCode 5000000
+        versionName 'v0.5.0.0'
     }
 
     signingConfigs {
@@ -40,4 +42,9 @@ android {
             minifyEnabled false
         }
     }
+}
+
+
+dependencies {
+    implementation 'androidx.core:core:1.15.0'
 }
