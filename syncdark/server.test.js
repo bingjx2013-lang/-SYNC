@@ -39,7 +39,7 @@ test('health endpoint responds with ok',async()=>{
   assert.equal(await r.text(),'ok');
 });
 test('status endpoint returns process metrics and disables caching',async()=>{
-  const r=await fetch(baseUrl+'/api/status');
+  const r=await fetch(baseUrl+'/api/status?version-check='+Date.now(),{cache:'no-store'});
   assert.equal(r.status,200);
   assert.match(r.headers.get('content-type')||'',/application\/json/);
   assert.equal(r.headers.get('cache-control'),'no-store');
@@ -50,6 +50,17 @@ test('status endpoint returns process metrics and disables caching',async()=>{
   assert.ok(s.rssMb>0);
   assert.equal(s.connectedClients,0);
 });
+test('APK download endpoint handles HEAD efficiently and rejects other methods',async()=>{
+  const head=await fetch(baseUrl+'/api/download/android.apk',{method:'HEAD',cache:'no-store'});
+  assert.ok([200,404].includes(head.status));
+  assert.equal(head.headers.get('cache-control'),'no-store');
+  assert.equal(await head.text(),'');
+  const post=await fetch(baseUrl+'/api/download/android.apk',{method:'POST'});
+  assert.equal(post.status,405);
+  assert.match(post.headers.get('allow')||'',/GET/);
+  assert.match(post.headers.get('cache-control')||'','no-store');
+});
+
 test('Android APK version metadata is explicit and never cached',async()=>{
   const r=await fetch(baseUrl+'/api/android/version?check='+Date.now());
   assert.match(r.headers.get('content-type')||'',/application\/json/);
