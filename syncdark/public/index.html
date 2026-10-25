@@ -74,6 +74,7 @@
       <button class="btn" id="appRefresh" style="background:transparent;border:0;color:#0969da;font-weight:700;font-size:15px;padding:12px">检查更新</button>
       <button class="btn" id="appWebsite" style="background:transparent;border:0;color:#0969da;font-weight:700;font-size:15px;padding:12px">访问官网</button>
     </div>
+    <p id="apkVersionInfo" aria-live="polite" style="font-size:12px;line-height:1.8;color:#7c8ca4;text-align:center;margin:12px 4px 0">正在读取已发布安装包版本…</p>
     <div style="font-size:12px;color:#7c8ca4;text-align:center;margin:12px 0 0">ANDROID APK / 测试渠道</div>
   </div>
   <div style="padding:20px 18px 25px;background:#fff;border-top:1px solid #dce4f0">
@@ -81,7 +82,7 @@
     <p style="text-align:center;color:#7c8ca4;font-size:12px;line-height:1.8;margin:15px 4px 0">下载完成后，在手机通知栏或“文件管理”中打开 APK 安装。若 Android 提示允许安装未知应用，请仅对你信任的来源授权。</p>
   </div>
 </div>
-<div class="footnote" style="color:#718399">版本来源：/api/status。版本检查成功不代表手机已安装最新 APK；安装包下载与 Android 系统安装是独立步骤。</div>
+<div class="footnote" style="color:#718399">网页版本状态来自 /api/status；Android 安装包版本来自 /api/android/version。固定下载地址 /api/download/android.apk 会提供最近一次成功发布的安装包。下载后仍需由 Android 系统确认安装，网页不能静默替手机升级。</div>
 </section><section class="page" id="tools"><div class="pagehead"><div><div class="eyebrow">SYSTEM UTILITIES / 05</div><h1>系统工具箱<span class="cyan">_</span></h1><p>常用编码与校验工具，全部在本地浏览器执行。</p></div><span class="tag">CLIENT SIDE</span></div>
 <div class="grid toolgrid">
 <div class="panel toolcard"><div class="bigicon">#</div><h3>SHA-256 哈希校验</h3><textarea class="field" id="hashInput" rows="3" placeholder="输入文本以生成 SHA-256"></textarea><button class="btn" id="hashBtn">计算摘要</button><div class="result" id="hashOut">等待输入…</div><small class="tiny">Web Crypto API · 不上传内容</small></div>
