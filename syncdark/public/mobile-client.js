@@ -6,6 +6,23 @@
   page.dataset.mobileReady = '1';
   const fallbackVersion = 'v0.3.3.2';
   const text = (id, value) => { const el = $('#' + id); if (el) el.textContent = value; };
+  async function loadApkVersion() {
+    try {
+      const response = await fetch('/api/android/version?check=' + Date.now(), { cache: 'no-store' });
+      if (!response.ok) throw new Error('apk-version');
+      const data = await response.json();
+      if (data.status !== 'available') throw new Error('apk-unavailable');
+      const size = Number(data.sizeBytes);
+      const sizeLabel = Number.isFinite(size) && size > 0
+        ? (size >= 1048576 ? (size / 1048576).toFixed(1) + ' MB' : Math.ceil(size / 1024) + ' KB')
+        : '大小未知';
+      const published = data.publishedAt ? new Date(data.publishedAt).toLocaleString() : '时间未知';
+      text('apkVersionInfo', '可下载版本：' + String(data.versionName) + '（构建号 ' + String(data.versionCode) + '） · ' + sizeLabel + ' · 发布于 ' + published);
+    } catch (_) {
+      text('apkVersionInfo', '尚未取得已发布安装包的版本信息；下载按钮会继续使用固定官方地址，安装包发布后这里会自动显示新版本。');
+    }
+  }
+
   async function loadVersions() {
     text('appVersionState', '正在检查版本…');
     try {
@@ -75,7 +92,7 @@
     try {
       const response = await fetch('/api/status?version-check=' + Date.now(), { cache: 'no-store' });
       if (!response.ok) throw new Error('server');
-      await loadVersions();
+      await Promise.all([loadVersions(), loadApkVersion()]);
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map(reg => reg.update().catch(() => {})));
@@ -90,5 +107,6 @@
   });
   text('appMode', 'Android APK / 测试渠道');
   loadVersions();
-  window.addEventListener('pageshow', loadVersions);
+  loadApkVersion();
+  window.addEventListener('pageshow', () => { loadVersions(); loadApkVersion(); });
 })();
