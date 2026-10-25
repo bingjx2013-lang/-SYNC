@@ -163,7 +163,7 @@ const srv=http.createServer((req,res)=>{
         return {id:target.id,name:target.name,provider:target.provider,category:target.category,kind:'public_endpoint_probe',lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:false,status:0,statusCode:0,latencyMs:null,checkedAt:Date.now(),detail:error.name==='AbortError'?'timeout':'connection failed'};
       }finally{clearTimeout(timer)}
     })).then(nodes=>{nodeSnapshot=nodes;nodeSnapshotAt=Date.now();return nodes}).finally(()=>{nodeProbeInFlight=null});
-    nodeProbeInFlight.then(nodes=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});
+    nodeProbeInFlight.then(nodes=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',kind:'public_endpoint_probes_not_nearby_devices',nodes}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',kind:'public_endpoint_probes_not_nearby_devices',nodes:[]}))});
     return
   }
   if(req.url.split('?')[0]==='/api/status'){
