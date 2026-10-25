@@ -67,6 +67,49 @@ function observeRequest(req){
 
 let lastCpu=process.cpuUsage(),lastCpuAt=Date.now();
 const MT={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml'};
+const ANDROID_RELEASES_API='https://api.github.com/repos/bingjx2013-lang/-SYNC/releases?per_page=20';
+let androidReleaseCache={checkedAt:0,release:null,error:null},androidReleaseInFlight=null;
+async function getAndroidRelease(force=false){
+  const now=Date.now();
+  if(!force&&androidReleaseCache.checkedAt&&now-androidReleaseCache.checkedAt<60000){
+    if(androidReleaseCache.release)return androidReleaseCache.release;
+    const cachedError=new Error(androidReleaseCache.error||'Android release unavailable');
+    cachedError.code=androidReleaseCache.error==='NO_ANDROID_RELEASE'?'NO_ANDROID_RELEASE':'RELEASE_LOOKUP_FAILED';
+    throw cachedError;
+  }
+  if(androidReleaseInFlight)return androidReleaseInFlight;
+  androidReleaseInFlight=(async()=>{
+    const response=await fetch(ANDROID_RELEASES_API,{headers:{'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'SYNC-Android-Updater/1.0'},signal:AbortSignal.timeout(8000)});
+    if(!response.ok)throw new Error('GitHub release API HTTP '+response.status);
+    const releases=await response.json();
+    if(!Array.isArray(releases))throw new Error('Invalid GitHub releases response');
+    const candidates=releases.filter(r=>r&&!r.draft&&/^v\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(String(r.tag_name||''))&&Array.isArray(r.assets))
+      .sort((a,b)=>Date.parse(b.published_at||b.created_at||0)-Date.parse(a.published_at||a.created_at||0));
+    for(const release of candidates){
+      const apkAsset=release.assets.find(a=>a.name==='syncdark-android.apk'&&Number(a.size)>0&&typeof a.browser_download_url==='string');
+      const metaAsset=release.assets.find(a=>a.name==='android-version.json'&&typeof a.browser_download_url==='string');
+      if(!apkAsset||!metaAsset)continue;
+      const metaResponse=await fetch(metaAsset.browser_download_url,{headers:{'Accept':'application/json','User-Agent':'SYNC-Android-Updater/1.0'},signal:AbortSignal.timeout(8000),redirect:'follow'});
+      if(!metaResponse.ok)continue;
+      let metadata;try{metadata=await metaResponse.json()}catch{continue}
+      const valid=metadata&&metadata.versionName===release.tag_name&&
+        /^v\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(String(metadata.versionName||''))&&
+        Number.isSafeInteger(Number(metadata.versionCode))&&Number(metadata.versionCode)>0&&
+        Number.isSafeInteger(Number(metadata.sizeBytes))&&Number(metadata.sizeBytes)===Number(apkAsset.size)&&
+        /^[a-f0-9]{64}$/.test(String(metadata.sha256||''))&&Number.isFinite(Date.parse(metadata.publishedAt||release.published_at||''));
+      if(!valid)continue;
+      const result={metadata:{versionName:metadata.versionName,versionCode:Number(metadata.versionCode),sha256:metadata.sha256,sizeBytes:Number(metadata.sizeBytes),publishedAt:metadata.publishedAt||release.published_at},apkUrl:apkAsset.browser_download_url,tagName:release.tag_name,releaseUrl:release.html_url};
+      androidReleaseCache={checkedAt:Date.now(),release:result,error:null};return result;
+    }
+    const missing=new Error('No valid Android APK release exists');missing.code='NO_ANDROID_RELEASE';throw missing;
+  })().catch(error=>{
+    const code=error.code==='NO_ANDROID_RELEASE'?'NO_ANDROID_RELEASE':'RELEASE_LOOKUP_FAILED';
+    androidReleaseCache={checkedAt:Date.now(),release:null,error:code};
+    const wrapped=new Error(error.message||'Android release lookup failed');wrapped.code=code;throw wrapped;
+  }).finally(()=>{androidReleaseInFlight=null});
+  return androidReleaseInFlight;
+}
+
 const srv=http.createServer((req,res)=>{
   observeRequest(req);
   if(req.url.split('?')[0]==='/api/threat-intel'){
@@ -107,7 +150,7 @@ const srv=http.createServer((req,res)=>{
   if(req.url.split('?')[0]==='/api/nodes'){
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
     const now=Date.now();
-    if(!req.url.includes('refresh=') && nodeSnapshot && now-nodeSnapshotAt<5000){res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:nodeSnapshot}));return}
+    if(!req.url.includes('refresh=') && nodeSnapshot && now-nodeSnapshotAt<5000){res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',kind:'public_endpoint_probes_not_nearby_devices',nodes:nodeSnapshot}));return}
     if(nodeProbeInFlight){nodeProbeInFlight.then(data=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:data}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});return}
     nodeProbeInFlight=Promise.all(NODE_TARGETS.map(async target=>{
       const start=Date.now();const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),3000);
@@ -115,7 +158,7 @@ const srv=http.createServer((req,res)=>{
         const response=await fetch(target.url,{method:'GET',headers:target.headers||{},signal:controller.signal,redirect:'follow'});
         const elapsed=Date.now()-start;
         await response.body?.cancel().catch(()=>{});
-        return {id:target.id,name:target.name,provider:target.provider,category:target.category,lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:response.status>=200&&response.status<400,status:response.status,statusCode:response.status,latencyMs:elapsed,checkedAt:Date.now(),detail:response.status>=200&&response.status<500?'HTTPS endpoint responded':'HTTP error'};
+        return {id:target.id,name:target.name,provider:target.provider,category:target.category,kind:'public_endpoint_probe',lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:response.status>=200&&response.status<400,status:response.status,statusCode:response.status,latencyMs:elapsed,checkedAt:Date.now(),detail:response.status>=200&&response.status<500?'HTTPS endpoint responded':'HTTP error'};
       }catch(error){
         return {id:target.id,name:target.name,provider:target.provider,category:target.category,lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:false,status:0,statusCode:0,latencyMs:null,checkedAt:Date.now(),detail:error.name==='AbortError'?'timeout':'connection failed'};
       }finally{clearTimeout(timer)}
@@ -132,62 +175,43 @@ const srv=http.createServer((req,res)=>{
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(JSON.stringify({uptimeSeconds:Math.floor(process.uptime()),cpuPercent:Number(cpuPercent.toFixed(1)),rssMb:Number((mem.rss/1048576).toFixed(1)),heapUsedMb:Number((mem.heapUsed/1048576).toFixed(1)),heapTotalMb:Number((mem.heapTotal/1048576).toFixed(1)),connectedClients,rooms:rooms.size,appVersion:'v0.5.0.0',latestAppVersion:'v0.5.0.0',serverVersion:'1.0.4',timestamp:now}));return
   }
   if(req.url.split('?')[0]==='/api/android/version'){
-    const jsonHeaders={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
-    const unavailable=()=>{
-      if(!res.headersSent)res.writeHead(503,jsonHeaders);
-      if(!res.writableEnded)res.end(JSON.stringify({status:'unavailable',error:'Android 安装包版本信息暂不可用。'}));
-    };
+    const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
     if(req.method!=='GET'&&req.method!=='HEAD'){
-      res.writeHead(405,{...jsonHeaders,'Allow':'GET, HEAD'}).end(JSON.stringify({status:'unavailable',error:'Method not allowed'}));
+      res.writeHead(405,{...headers,'Allow':'GET, HEAD'}).end(JSON.stringify({status:'unavailable',error:'Method not allowed'}));
       return
     }
-    const metadataPath=path.join(PUB,'downloads','android-version.json');
-    const apkPath=path.join(PUB,'downloads','syncdark-android-test.apk');
-    fs.readFile(metadataPath,'utf8',(metadataError,raw)=>{
-      if(metadataError){unavailable();return}
-      let metadata;
-      try{metadata=JSON.parse(raw)}catch{unavailable();return}
-      fs.stat(apkPath,(statError,stat)=>{
-        const versionName=metadata&&metadata.versionName;
-        const versionCode=Number(metadata&&metadata.versionCode);
-        const sizeBytes=Number(metadata&&metadata.sizeBytes);
-        const sha256=String(metadata&&metadata.sha256||'');
-        const publishedAt=String(metadata&&metadata.publishedAt||'');
-        const valid=!statError&&stat.isFile()&&stat.size>0&&
-          typeof versionName==='string'&&/^[A-Za-z0-9._+-]{1,64}$/.test(versionName)&&
-          Number.isSafeInteger(versionCode)&&versionCode>0&&
-          Number.isSafeInteger(sizeBytes)&&sizeBytes===stat.size&&
-          /^[a-f0-9]{64}$/i.test(sha256)&&Number.isFinite(Date.parse(publishedAt));
-        if(!valid){unavailable();return}
-        const payload={status:'available',versionName,versionCode,sha256:sha256.toLowerCase(),sizeBytes,publishedAt,downloadUrl:'/api/download/android.apk'};
-        res.writeHead(200,jsonHeaders);
-        res.end(req.method==='HEAD'?'':JSON.stringify(payload));
-      });
+    getAndroidRelease().then(release=>{
+      res.writeHead(200,headers);
+      res.end(req.method==='HEAD'?'':JSON.stringify({...release.metadata,status:'available',downloadUrl:'/api/download/android.apk',releaseTag:release.tagName,releaseUrl:release.releaseUrl}));
+    }).catch(error=>{
+      res.writeHead(503,headers);
+      res.end(JSON.stringify({status:'unavailable',code:error.code==='NO_ANDROID_RELEASE'?'release_not_published':'release_service_unavailable',error:error.code==='NO_ANDROID_RELEASE'?'尚未发布可用的签名 Android APK。':'Android 版本服务暂时不可用，请稍后重试。'}));
     });
     return
   }
   if(req.url.split('?')[0]==='/api/download/android.apk'){
-    const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
+    const jsonHeaders={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
     if(req.method!=='GET'&&req.method!=='HEAD'){
-      res.writeHead(405,{...headers,'Allow':'GET, HEAD'}).end(JSON.stringify({error:'Method not allowed'}));
+      res.writeHead(405,{...jsonHeaders,'Allow':'GET, HEAD'}).end(JSON.stringify({error:'Method not allowed'}));
       return
     }
-    const apkPath=path.join(PUB,'downloads','syncdark-android-test.apk');
-    fs.stat(apkPath,(error,stat)=>{
-      if(error||!stat.isFile()){
-        res.writeHead(404,headers);
-        res.end(req.method==='HEAD'?'':JSON.stringify({error:'Android APK 正在准备中，请稍后重试。'}));
-        return;
+    getAndroidRelease().then(async release=>{
+      if(req.method==='HEAD'){
+        res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="syncdark-android.apk"','Content-Length':release.metadata.sizeBytes,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+        res.end();return
       }
-      res.writeHead(200,{
-        'Content-Type':'application/vnd.android.package-archive',
-        'Content-Disposition':'attachment; filename="syncdark-android-test.apk"',
-        'Content-Length':stat.size,
-        'Cache-Control':'no-store',
-        'X-Content-Type-Options':'nosniff'
-      });
-      if(req.method==='HEAD'){res.end();return}
-      fs.createReadStream(apkPath).pipe(res);
+      const remote=await fetch(release.apkUrl,{headers:{'Accept':'application/vnd.android.package-archive','User-Agent':'SYNC-Android-Updater/1.0'},signal:AbortSignal.timeout(30000),redirect:'follow'});
+      if(!remote.ok||!remote.body)throw new Error('release asset fetch failed');
+      const bytes=Buffer.from(await remote.arrayBuffer());
+      if(bytes.length!==release.metadata.sizeBytes||crypto.createHash('sha256').update(bytes).digest('hex')!==release.metadata.sha256){
+        res.writeHead(502,jsonHeaders).end(JSON.stringify({error:'APK 完整性核验失败，已阻止下载。'}));return
+      }
+      res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="syncdark-android.apk"','Content-Length':bytes.length,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+      res.end(bytes);
+    }).catch(error=>{
+      if(res.writableEnded)return;
+      const status=error.code==='NO_ANDROID_RELEASE'?503:502;
+      res.writeHead(status,jsonHeaders).end(JSON.stringify({error:status===503?'尚未发布可用的签名 Android APK。':'Android 安装包暂时无法下载，请稍后重试。'}));
     });
     return
   }
