@@ -22,6 +22,8 @@ android {
             // Never commit the keystore or its passwords to source control.
             if (syncKeystoreFile) {
                 storeFile file(syncKeystoreFile)
+                // The release keystore created on the user's phone is PKCS12.
+                storeType = "PKCS12"
                 storePassword System.getenv('SYNCDARK_KEYSTORE_PASSWORD')
                 keyAlias System.getenv('SYNCDARK_KEY_ALIAS')
                 keyPassword System.getenv('SYNCDARK_KEY_PASSWORD')
