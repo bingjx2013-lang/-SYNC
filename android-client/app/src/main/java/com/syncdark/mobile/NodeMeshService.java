@@ -11,7 +11,8 @@ import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.SystemClock;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -20,6 +21,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,6 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class NodeMeshService extends Service {
     public static final String ACTION_STATUS = "com.syncdark.mobile.NODE_STATUS";
     public static final String EXTRA_STATUS = "status";
+    public static final String EXTRA_PEERS_JSON = "peers_json";
+    private static volatile String latestSnapshot = "{\"running\":false,\"status\":\"附近节点服务尚未启动\",\"peers\":[]}";
     private static final String CHANNEL = "syncdark_mesh";
     private static final int NOTIFICATION_ID = 39473;
     private static final String SERVICE_TYPE = "_syncdark._tcp.";
@@ -41,6 +46,44 @@ public final class NodeMeshService extends Service {
     private String nodeId;
     private volatile int peers = 0;
     private final java.util.Set<String> handshakenServices = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Map<String, PeerRecord> discoveredPeers = new ConcurrentHashMap<>();
+    private volatile String currentStatus = "附近节点服务尚未启动";
+
+    private static final class PeerRecord {
+        final String name, host;
+        final int port;
+        final long seenAt;
+        PeerRecord(String name, String host, int port, long seenAt) {
+            this.name = name; this.host = host; this.port = port; this.seenAt = seenAt;
+        }
+    }
+
+    public static String getSnapshotJson() { return latestSnapshot; }
+
+    private void publishSnapshot() {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("running", running.get());
+            root.put("status", currentStatus);
+            root.put("nodeId", nodeId == null ? "" : nodeId);
+            root.put("checkedAt", System.currentTimeMillis());
+            JSONArray list = new JSONArray();
+            for (PeerRecord peer : discoveredPeers.values()) {
+                JSONObject item = new JSONObject();
+                item.put("name", peer.name);
+                item.put("host", peer.host);
+                item.put("port", peer.port);
+                item.put("lastSeen", peer.seenAt);
+                item.put("protocol", 1);
+                item.put("capabilities", new JSONArray().put("discovery").put("lan-handshake"));
+                list.put(item);
+            }
+            root.put("peers", list);
+            latestSnapshot = root.toString();
+        } catch (Exception ignored) {
+            latestSnapshot = "{\"running\":" + running.get() + ",\"status\":\"状态暂不可用\",\"peers\":[]}";
+        }
+    }
 
     @Override public void onCreate() {
         super.onCreate();
@@ -143,6 +186,7 @@ public final class NodeMeshService extends Service {
                 String name = serviceInfo.getServiceName();
                 if (name != null && handshakenServices.remove(name)) {
                     synchronized (NodeMeshService.this) { peers = Math.max(0, peers - 1); }
+                    discoveredPeers.remove(name);
                 }
                 broadcastStatus("附近节点发生变化");
             }
@@ -162,8 +206,11 @@ public final class NodeMeshService extends Service {
                 String response = reader.readLine();
                 if (response != null && response.contains("\"protocol\":1") && !response.contains("\"" + nodeId + "\"")) {
                     String peerName = info.getServiceName();
-                    if (peerName != null && handshakenServices.add(peerName)) {
-                        synchronized (NodeMeshService.this) { peers = Math.min(999, peers + 1); }
+                    if (peerName != null) {
+                        boolean isNew = handshakenServices.add(peerName);
+                        if (isNew) synchronized (NodeMeshService.this) { peers = Math.min(999, peers + 1); }
+                        String host = info.getHost() == null ? "" : info.getHost().getHostAddress();
+                        discoveredPeers.put(peerName, new PeerRecord(peerName, host, info.getPort(), System.currentTimeMillis()));
                         broadcastStatus("已发现可连接的 SYNC 节点：" + peerName + "；当前已连接节点 " + peers + " 台");
                         updateNotification("已发现 SYNC 节点；本机正在提供局域网握手服务");
                     }
@@ -195,15 +242,29 @@ public final class NodeMeshService extends Service {
     }
 
     private void broadcastStatus(String status) {
+        currentStatus = status == null ? "" : status;
+        publishSnapshot();
         Intent intent = new Intent(ACTION_STATUS);
         intent.setPackage(getPackageName());
-        intent.putExtra(EXTRA_STATUS, status);
+        intent.putExtra(EXTRA_STATUS, currentStatus);
+        intent.putExtra(EXTRA_PEERS_JSON, latestSnapshot);
         sendBroadcast(intent);
-        updateNotification(status);
+        updateNotification(currentStatus);
     }
 
     @Override public void onDestroy() {
         running.set(false);
+        handshakenServices.clear();
+        discoveredPeers.clear();
+        peers = 0;
+        currentStatus = "附近节点服务已停止";
+        publishSnapshot();
+        Intent stopped = new Intent(ACTION_STATUS);
+        stopped.setPackage(getPackageName());
+        stopped.putExtra(EXTRA_STATUS, currentStatus);
+        stopped.putExtra(EXTRA_PEERS_JSON, latestSnapshot);
+        sendBroadcast(stopped);
+        try { stopForeground(true); } catch (Exception ignored) {}
         try { if (server != null) server.close(); } catch (Exception ignored) {}
         try { if (discovery != null) nsd.stopServiceDiscovery(discovery); } catch (Exception ignored) {}
         try { if (registration != null) nsd.unregisterService(registration); } catch (Exception ignored) {}
