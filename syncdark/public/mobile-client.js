@@ -34,10 +34,10 @@
       text('appCurrent', app);
       text('serverVersion', 'SYS.V ' + String(data.serverVersion || '未知'));
       text('appLatest', latest);
-      text('appVersionState', app === latest ? '当前已是最新版本，可以查看更新内容或重新下载安装包。' : '发现新测试版本，请获取新版 APK。');
-      text('appUpdateText', app === latest
-        ? '常规更新 · 聊天同步与连接稳定性优化。版本登记不代表手机已安装该 APK。'
-        : '发现新测试版本 ' + latest + '。下载 APK 后，请按 Android 系统提示完成安装。');
+      text('appVersionState', app === latest
+        ? '网页服务版本信息已读取；APK 实际可下载版本请看下方。'
+        : '网页服务有新版本登记；请以“可下载版本”区域显示的 APK 版本为准。');
+      text('appUpdateText', '网页服务版本：' + app + '；网页登记版本：' + latest + '。这些数字不代表手机当前安装的 APK 版本。');
     } catch (_) {
       text('appVersionState', '无法读取服务器版本');
       text('appCurrent', fallbackVersion);
