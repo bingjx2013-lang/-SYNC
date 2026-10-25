@@ -100,7 +100,7 @@ test('dashboard JavaScript parses and interactive 3D globe is present',()=>{
   const scripts=html.split('<script>').slice(1).map(part=>part.split('</script>')[0]);
   assert.ok(scripts.length>=1,'inline application script should exist');
   for(const script of scripts)new vm.Script(script);
-  for(const marker of ['globeCanvas','pointerdown','pointermove','globePlus','globeMinus','/api/status','/api/nodes','LIVE PROBE REGISTRY','probeColor','bezierPoint','setTimeout(tick,2000)','nearbyPanel','nearbyRegistry','nearbyStart','syncNearbyNodes','Android 客户端'])assert.ok(html.includes(marker),'missing '+marker);
+  for(const marker of ['globeCanvas','pointerdown','pointermove','globePlus','globeMinus','/api/status','/api/nodes','LIVE PROBE REGISTRY','probeColor','bezierPoint','setTimeout(tick,2000)','nearbyPanel','nearbyRegistry','nearbyStart','syncNearbyNodes','Android 客户端','RELEASE CENTER','apkVersionLabel','apkBuildLabel','apkSizeLabel','appProgress','appRefresh','appInstall','aria-valuenow','SHA-256'])assert.ok(html.includes(marker),'missing '+marker);
   assert.match(html,/GLOBAL NETWORK \/ LIVE ROUTES/);
   assert.match(html,/未生成模拟数据/);
 });
