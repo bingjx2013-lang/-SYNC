@@ -12,8 +12,8 @@ android {
         applicationId 'com.syncdark.mobile'
         minSdk 23
         targetSdk 35
-        versionCode 3332
-        versionName '0.3.3.2'
+        versionCode 3333
+        versionName '0.4.0-mesh1'
     }
 
     signingConfigs {
