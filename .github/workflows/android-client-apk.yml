@@ -86,13 +86,13 @@ jobs:
       - name: Generate verified metadata and publish test prerelease
         shell: bash
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           APK="android-client/app/build/outputs/apk/release/app-release.apk"
-          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\\1/p" android-client/app/build.gradle | head -n1)"
-          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\\1/p' android-client/app/build.gradle | head -n1)"
-          [[ "$VERSION_NAME" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$ ]]
+          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\1/p" android-client/app/build.gradle | head -n1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' android-client/app/build.gradle | head -n1)"
+          [[ "$VERSION_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
           if gh release view "$VERSION_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag already exists; increment versionName/versionCode before another build."
@@ -112,7 +112,7 @@ jobs:
             sizeBytes: Number(process.env.SIZE_BYTES),
             sha256: process.env.SHA256,
             publishedAt: process.env.PUBLISHED_AT
-          }, null, 2) + '\\n');
+          }, null, 2) + '\n');
           NODE
           gh release create "$VERSION_NAME" \\
             "$RUNNER_TEMP/syncdark-release/syncdark-android.apk#SYNC Android APK" \\
