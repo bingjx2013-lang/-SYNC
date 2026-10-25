@@ -5,7 +5,7 @@
   if (!page || page.dataset.mobileReady === '1') return;
   page.dataset.mobileReady = '1';
 
-  const fallbackVersion = 'v0.4.0.0';
+  const fallbackVersion = 'v0.6.0.0';
   const targetVersionFormat = /^v\d+\.\d+\.\d+\.\d+$/;
   const text = (id, value) => { const el = $('#' + id); if (el) el.textContent = value; };
   const nativeUpdater = window.SyncAndroidUpdater || null;
@@ -83,8 +83,13 @@
 
   async function loadApkVersion() {
     const response = await fetch('/api/android/version?check=' + Date.now(), { cache: 'no-store' });
-    if (!response.ok) throw new Error('当前没有已发布的签名 APK');
-    const data = await response.json();
+    let data;
+    try { data = await response.json(); } catch (_) { data = {}; }
+    if (!response.ok || data.status !== 'available') {
+      if (data.code === 'release_not_published') throw new Error('正式签名 APK 尚未发布');
+      if (data.code === 'release_service_unavailable') throw new Error('版本服务暂时不可用，请检查网络后重试');
+      throw new Error('版本检查失败（HTTP ' + response.status + '）');
+    }
     if (data.status !== 'available' || !targetVersionFormat.test(String(data.versionName)) ||
         !Number.isSafeInteger(Number(data.versionCode)) || Number(data.versionCode) <= 0 ||
         !/^[a-f0-9]{64}$/i.test(String(data.sha256)) ||
@@ -182,6 +187,9 @@
     refresh.disabled = true;
     refresh.textContent = '正在检查…';
     installed = readInstalledVersion();
+    latestApk = null;
+    text('apkVersionInfo', '正在查询最新签名 APK 及完整性信息…');
+    text('appVersionState', '正在检查更新…');
     try {
       await loadVersions();
       await loadApkVersion();
@@ -200,7 +208,14 @@
             : latestApk ? '最新 APK 版本信息已刷新。' : '未能取得 APK 版本信息。');
       refresh.textContent = '检查完成';
     } catch (error) {
-      text('appVersionState', '检查失败：' + (error.message || '请检查网络'));
+      const message = error.message || '请检查网络';
+      text('apkVersionInfo', '无法取得可用的签名 APK：' + message);
+      text('appVersionState', '检查失败：' + message);
+      text('appLatest', '暂无可用版本');
+      text('apkVersionLabel', '暂不可用');
+      text('apkBuildLabel', '—');
+      text('apkSizeLabel', '—');
+      setProgress(0, '检查失败，没有开始下载', '更新检查失败');
     } finally {
       refresh.disabled = false;
       refresh.textContent = '检查更新';
@@ -211,14 +226,15 @@
   installed = readInstalledVersion();
   loadVersions();
   loadApkVersion().catch(error => {
-    text('apkVersionInfo', '尚无可供下载的签名 APK：' + (error.message || '版本接口暂不可用'));
-    text('appVersionState', '暂未发布可下载的签名 APK');
-    text('appLatest', '暂无发布');
-    text('appUpdateText', '版本接口没有找到带有效版本清单的发布包。请稍后重新检查；不会伪造更新或下载成功。');
-    text('apkVersionLabel', '尚未发布');
+    const message = error.message || '版本接口暂不可用';
+    text('apkVersionInfo', '无法取得可用的签名 APK：' + message);
+    text('appVersionState', message);
+    text('appLatest', '暂无可用版本');
+    text('appUpdateText', '当前没有可验证并下载安装的签名 APK，或版本服务暂时不可用。请重新检查；不会伪造更新或下载成功。');
+    text('apkVersionLabel', '暂不可用');
     text('apkBuildLabel', '—');
     text('apkSizeLabel', '—');
-    setProgress(0, '尚未发布可下载的 APK', '等待正式测试发布');
+    setProgress(0, '尚无可验证的 APK；请稍后重新检查', '等待有效发布包');
   });
   window.addEventListener('pageshow', () => {
     installed = readInstalledVersion();
