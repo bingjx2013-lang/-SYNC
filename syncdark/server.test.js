@@ -70,9 +70,11 @@ test('read-only operations diagnostics report dependencies without secrets or ch
   assert.ok(data.security.events>=0&&data.security.events<=data.security.retentionLimit);
   for(const key of ['high','medium','low'])assert.ok(Number.isInteger(data.security.severityCounts[key]));
   const serialized=JSON.stringify(data);
-  assert.doesNotMatch(serialized,/postgres(?:ql)?:\\/\\//i,'connection URLs must not be returned');
-  assert.doesNotMatch(serialized,/rediss?:\\/\\//i,'Redis URLs must not be returned');
-  assert.doesNotMatch(serialized,/syncdark:chat:history:/,'internal Redis history keys must not be returned');
+  assert.equal(serialized.includes('postgres://'),false,'PostgreSQL connection URLs must not be returned');
+  assert.equal(serialized.includes('postgresql://'),false,'PostgreSQL connection URLs must not be returned');
+  assert.equal(serialized.includes('redis://'),false,'Redis connection URLs must not be returned');
+  assert.equal(serialized.includes('rediss://'),false,'Redis connection URLs must not be returned');
+  assert.equal(serialized.includes('syncdark:chat:history:'),false,'internal Redis history keys must not be returned');
 });
 
 test('PWA manifest, service worker, and icons are served',async()=>{
