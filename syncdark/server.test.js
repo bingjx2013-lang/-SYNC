@@ -50,6 +50,31 @@ test('status endpoint returns process metrics and disables caching',async()=>{
   assert.ok(s.rssMb>0);
   assert.equal(s.connectedClients,0);
 });
+test('read-only operations diagnostics report dependencies without secrets or chat contents',async()=>{
+  const r=await fetch(baseUrl+'/api/ops');
+  assert.equal(r.status,200);
+  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.equal(r.headers.get('cache-control'),'no-store');
+  assert.equal(r.headers.get('x-content-type-options'),'nosniff');
+  const data=await r.json();
+  assert.ok(['ok','degraded'].includes(data.status));
+  assert.ok(Number.isFinite(data.checkedAt));
+  assert.equal(data.dependencies.postgres.configured,Boolean(process.env.DATABASE_URL));
+  assert.equal(data.dependencies.redis.configured,Boolean(process.env.REDIS_URL));
+  assert.ok(Number.isInteger(data.dependencies.websocket.connectedClients));
+  assert.ok(Number.isInteger(data.dependencies.websocket.activeRooms));
+  assert.ok(data.process.rssMb>0);
+  assert.ok(['not_checked','fresh','stale'].includes(data.probes.status));
+  assert.ok(['not_checked','checking','fresh','stale'].includes(data.threatIntel.status));
+  assert.equal(data.security.scope,'current-process-memory-only');
+  assert.ok(data.security.events>=0&&data.security.events<=data.security.retentionLimit);
+  for(const key of ['high','medium','low'])assert.ok(Number.isInteger(data.security.severityCounts[key]));
+  const serialized=JSON.stringify(data);
+  assert.doesNotMatch(serialized,/postgres(?:ql)?:\\/\\//i,'connection URLs must not be returned');
+  assert.doesNotMatch(serialized,/rediss?:\\/\\//i,'Redis URLs must not be returned');
+  assert.doesNotMatch(serialized,/syncdark:chat:history:/,'internal Redis history keys must not be returned');
+});
+
 test('PWA manifest, service worker, and icons are served',async()=>{
   for(const [url,type] of [['/manifest.webmanifest',/application\/manifest\+json/],['/sw.js',/javascript/],['/icon-192.png',/image\/png/],['/icon-512.png',/image\/png/]]){
     const r=await fetch(baseUrl+url);
