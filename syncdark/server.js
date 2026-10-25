@@ -151,7 +151,7 @@ const srv=http.createServer((req,res)=>{
     res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
     const now=Date.now();
     if(!req.url.includes('refresh=') && nodeSnapshot && now-nodeSnapshotAt<5000){res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',kind:'public_endpoint_probes_not_nearby_devices',nodes:nodeSnapshot}));return}
-    if(nodeProbeInFlight){nodeProbeInFlight.then(data=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes:data}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});return}
+    if(nodeProbeInFlight){nodeProbeInFlight.then(data=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',kind:'public_endpoint_probes_not_nearby_devices',nodes:data}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',kind:'public_endpoint_probes_not_nearby_devices',nodes:[]}))});return}
     nodeProbeInFlight=Promise.all(NODE_TARGETS.map(async target=>{
       const start=Date.now();const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),3000);
       try{
@@ -160,7 +160,7 @@ const srv=http.createServer((req,res)=>{
         await response.body?.cancel().catch(()=>{});
         return {id:target.id,name:target.name,provider:target.provider,category:target.category,kind:'public_endpoint_probe',lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:response.status>=200&&response.status<400,status:response.status,statusCode:response.status,latencyMs:elapsed,checkedAt:Date.now(),detail:response.status>=200&&response.status<500?'HTTPS endpoint responded':'HTTP error'};
       }catch(error){
-        return {id:target.id,name:target.name,provider:target.provider,category:target.category,lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:false,status:0,statusCode:0,latencyMs:null,checkedAt:Date.now(),detail:error.name==='AbortError'?'timeout':'connection failed'};
+        return {id:target.id,name:target.name,provider:target.provider,category:target.category,kind:'public_endpoint_probe',lat:target.lat,lon:target.lon,endpoint:target.displayUrl,ok:false,status:0,statusCode:0,latencyMs:null,checkedAt:Date.now(),detail:error.name==='AbortError'?'timeout':'connection failed'};
       }finally{clearTimeout(timer)}
     })).then(nodes=>{nodeSnapshot=nodes;nodeSnapshotAt=Date.now();return nodes}).finally(()=>{nodeProbeInFlight=null});
     nodeProbeInFlight.then(nodes=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:nodeSnapshotAt,source:'server-side HTTPS probes from this deployment region',nodes}))}).catch(()=>{if(!res.writableEnded)res.end(JSON.stringify({checkedAt:Date.now(),source:'server-side HTTPS probes from this deployment region',nodes:[]}))});
