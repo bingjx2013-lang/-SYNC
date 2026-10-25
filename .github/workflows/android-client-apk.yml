@@ -83,46 +83,45 @@ jobs:
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
 
-      - name: Generate release metadata for the stable download button
+      - name: Generate verified metadata and publish test prerelease
         shell: bash
+        env:
+          GH_TOKEN: \${{ github.token }}
         run: |
+          set -euo pipefail
           APK="android-client/app/build/outputs/apk/release/app-release.apk"
-          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\\1/p" android-client/app/build.gradle | tail -n 1)"
-          VERSION_CODE="$(sed -nE "s/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\\1/p" android-client/app/build.gradle | tail -n 1)"
-          test -n "$VERSION_NAME"
-          test -n "$VERSION_CODE"
-          SHA256="$(sha256sum "$APK" | awk '{print $1}')"
-          SIZE_BYTES="$(wc -c < "$APK" | tr -d ' ')"
-          PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          mkdir -p syncdark/public/downloads
-          node - "$VERSION_NAME" "$VERSION_CODE" "$SHA256" "$SIZE_BYTES" "$PUBLISHED_AT" <<'NODE'
-          const fs = require('node:fs');
-          const [versionName, versionCode, sha256, sizeBytes, publishedAt] = process.argv.slice(2);
-          fs.writeFileSync('syncdark/public/downloads/android-version.json', JSON.stringify({
-            status: 'available',
-            versionName,
-            versionCode: Number(versionCode),
-            sha256,
-            sizeBytes: Number(sizeBytes),
-            publishedAt
-          }, null, 2) + '\n');
-          NODE
-
-      - name: Publish APK for direct website download
-        shell: bash
-        run: |
-          mkdir -p syncdark/public/downloads
-          cp android-client/app/build/outputs/apk/release/app-release.apk syncdark/public/downloads/syncdark-android-test.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add syncdark/public/downloads/syncdark-android-test.apk syncdark/public/downloads/android-version.json
-          if git diff --cached --quiet; then
-            echo "APK binary is unchanged."
-          else
-            git commit -m "Publish persistently signed Android test APK"
-            git pull --rebase origin feature/live-refresh-3d-globe
-            git push
+          VERSION_NAME="$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+'([^']+)'.*/\\1/p" android-client/app/build.gradle | head -n1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\\1/p' android-client/app/build.gradle | head -n1)"
+          [[ "$VERSION_NAME" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$ ]]
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+          if gh release view "$VERSION_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release tag already exists; increment versionName/versionCode before another build."
+            exit 1
           fi
+          mkdir -p "$RUNNER_TEMP/syncdark-release"
+          cp "$APK" "$RUNNER_TEMP/syncdark-release/syncdark-android.apk"
+          SIZE_BYTES="$(stat -c '%s' "$RUNNER_TEMP/syncdark-release/syncdark-android.apk")"
+          SHA256="$(sha256sum "$RUNNER_TEMP/syncdark-release/syncdark-android.apk" | awk '{print $1}')"
+          PUBLISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          VERSION_NAME="$VERSION_NAME" VERSION_CODE="$VERSION_CODE" SIZE_BYTES="$SIZE_BYTES" SHA256="$SHA256" PUBLISHED_AT="$PUBLISHED_AT" node - "$RUNNER_TEMP/syncdark-release/android-version.json" <<'NODE'
+          const fs = require('node:fs');
+          const [out] = process.argv.slice(2);
+          fs.writeFileSync(out, JSON.stringify({
+            versionName: process.env.VERSION_NAME,
+            versionCode: Number(process.env.VERSION_CODE),
+            sizeBytes: Number(process.env.SIZE_BYTES),
+            sha256: process.env.SHA256,
+            publishedAt: process.env.PUBLISHED_AT
+          }, null, 2) + '\\n');
+          NODE
+          gh release create "$VERSION_NAME" \\
+            "$RUNNER_TEMP/syncdark-release/syncdark-android.apk#SYNC Android APK" \\
+            "$RUNNER_TEMP/syncdark-release/android-version.json#Android version manifest" \\
+            --repo "$GITHUB_REPOSITORY" \\
+            --target feature/live-refresh-3d-globe \\
+            --title "SYNC Android $VERSION_NAME" \\
+            --notes "Signed SYNC Android test build. The updater validates APK size and SHA-256 before installing. Test prerelease only; not a production deployment." \\
+            --prerelease
 
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
