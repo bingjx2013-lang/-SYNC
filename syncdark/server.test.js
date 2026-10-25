@@ -52,7 +52,7 @@ test('status endpoint returns process metrics and disables caching',async()=>{
 });
 test('Android APK version metadata is explicit and never cached',async()=>{
   const r=await fetch(baseUrl+'/api/android/version?check='+Date.now());
-  assert.match(r.headers.get('content-type')||'',/application\\/json/);
+  assert.match(r.headers.get('content-type')||'',/application\/json/);
   assert.equal(r.headers.get('cache-control'),'no-store');
   assert.equal(r.headers.get('x-content-type-options'),'nosniff');
   assert.ok([200,503].includes(r.status));
